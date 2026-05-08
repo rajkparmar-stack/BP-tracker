@@ -482,7 +482,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);min-height:100
         <input type="file" accept="image/*" onchange="onFile(this.files[0])">
         <div style="font-size:22px;margin-bottom:6px">📷</div>
         <div style="font-size:13px;color:var(--muted)">Upload a BP monitor screenshot</div>
-        <div style="font-size:11px;color:var(--hint);margin-top:3px">Tap · drag &amp; drop · paste (Ctrl+V)</div>
+        <div style="font-size:11px;color:var(--hint);margin-top:3px" id="upz-hint">Tap · drag & drop · paste (Ctrl+V)</div>
       </div>
       <div class="scan-wrap" id="scanw">
         <div class="scan-prev">
@@ -610,7 +610,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);min-height:100
   <div class="page" id="tab-profile">
     <div id="prof-content"></div>
     <button class="btn-outline btn-full" onclick="editProfile()">Edit health profile</button>
-    <button class="btn-outline btn-full btn-danger" onclick="doLogout()">Sign out</button>
+
+    <!-- API Key settings for screenshot scanning -->
+    <div class="card" style="margin-top:16px">
+      <div class="ctitle">Screenshot scanning</div>
+      <div id="api-key-status" style="font-size:13px;color:var(--muted);margin-bottom:12px"></div>
+      <div class="fg" style="margin-bottom:10px">
+        <label>Anthropic API key</label>
+        <input type="password" id="api-key-input" placeholder="sk-ant-..." autocomplete="off"
+          style="font-family:monospace;font-size:13px;letter-spacing:0.5px">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-outline" style="flex:1" onclick="saveApiKey()">Save key</button>
+        <button class="btn-outline btn-danger" onclick="clearApiKey()">Remove</button>
+      </div>
+      <p style="font-size:11px;color:var(--hint);margin-top:10px;line-height:1.5">
+        Your key is stored only in this browser's local storage and never sent anywhere except directly to Anthropic for image scanning. Get your key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a>. Replace with a Cloudflare Worker proxy before sharing publicly.
+      </p>
+    </div>
+
+    <button class="btn-outline btn-full btn-danger" onclick="doLogout()" style="margin-top:4px">Sign out</button>
   </div>
 </div>
 
@@ -633,8 +652,16 @@ const DB={
 
 let UID=null;
 
+/* ── CONFIG ── replace with your Cloudflare Worker URL after deploying worker.js ── */
+const API_PROXY = '';  // e.g. 'https://bp-proxy.yourname.workers.dev'
+/* ─────────────────────────────────────────────────────────────────────────────── */
+
 /* ── UTILS ── */
-function hsh(s){let h=0;for(const c of s){h=(h<<5)-h+c.charCodeAt(0);h|=0;}return h.toString(36);}
+async function hsh(s){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:null;}
 function fmtDT(iso){const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
 function pp(s,d){return s-d;}
@@ -653,14 +680,15 @@ function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classL
 /* ── AUTH ── */
 function showReg(){document.getElementById('login-form').style.display='none';document.getElementById('reg-form').style.display='block';}
 function showLogin(){document.getElementById('reg-form').style.display='none';document.getElementById('login-form').style.display='block';}
-function doLogin(){
+async function doLogin(){
   const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value;
-  const user=DB.users().find(x=>x.u.toLowerCase()===u.toLowerCase()&&x.p===hsh(p));
+  const ph=await hsh(p);
+  const user=DB.users().find(x=>x.u.toLowerCase()===u.toLowerCase()&&x.p===ph);
   if(!user){document.getElementById('lerr').style.display='block';return;}
   document.getElementById('lerr').style.display='none';
   UID=user.id;DB.setSession(UID);afterLogin();
 }
-function doRegister(){
+async function doRegister(){
   const u=document.getElementById('ru').value.trim(),p=document.getElementById('rp').value,p2=document.getElementById('rp2').value;
   const e=document.getElementById('rerr');
   if(!u){e.textContent='Please enter a username.';e.style.display='block';return;}
@@ -668,7 +696,7 @@ function doRegister(){
   if(p!==p2){e.textContent='Passwords do not match.';e.style.display='block';return;}
   if(DB.users().find(x=>x.u.toLowerCase()===u.toLowerCase())){e.textContent='Username taken.';e.style.display='block';return;}
   const uid='u'+Date.now(),users=DB.users();
-  users.push({id:uid,u,p:hsh(p)});DB.saveUsers(users);
+  users.push({id:uid,u,p:await hsh(p)});DB.saveUsers(users);
   UID=uid;DB.setSession(UID);e.style.display='none';afterLogin();
 }
 function afterLogin(){DB.profile(UID)?openApp():startWizard();}
@@ -715,6 +743,12 @@ function openApp(){
     document.getElementById('hav').textContent=ini;
     document.getElementById('hname').textContent=p.name.split(' ')[0];
   }
+  // Update upload zone hint based on key availability
+  const hasKey = !!localStorage.getItem('bp_apikey') || !!API_PROXY;
+  const hint = document.getElementById('upz-hint');
+  if(hint) hint.textContent = hasKey
+    ? 'Tap · drag & drop · paste (Ctrl+V)'
+    : 'Tap · drag & drop · paste — or go to Profile to enable scanning';
   showScreen('app');setNow();refreshAll();
   runPatternAgent();
 }
@@ -729,7 +763,7 @@ function goTab(name){
   if(name==='stats')renderStats();
   if(name==='history')renderHistory();
   if(name==='insights')renderInsights();
-  if(name==='profile')renderProfile();
+  if(name==='profile'){renderProfile();updateApiKeyStatus();}
 }
 
 /* ── IMAGE SCAN ── */
@@ -745,9 +779,18 @@ function startScan(url){
   extractBP(url);
 }
 async function extractBP(dataUrl){
+  const apiKey = localStorage.getItem('bp_apikey') || '';
+  if(!apiKey && !API_PROXY){
+    document.getElementById('sstat').innerHTML='⚠ API key not set';
+    document.getElementById('ssub2').textContent='Go to Profile → Screenshot scanning to add your Anthropic API key.';
+    return;
+  }
   const b64=dataUrl.split(',')[1],mime=(dataUrl.match(/^data:(image\/\w+);/)||[])[1]||'image/jpeg';
+  const endpoint = API_PROXY || 'https://api.anthropic.com/v1/messages';
+  const headers = {'Content-Type':'application/json'};
+  if(!API_PROXY && apiKey) { headers['x-api-key'] = apiKey; headers['anthropic-version'] = '2023-06-01'; }
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:'Extract blood pressure from this image. Return ONLY JSON: {"sys":int,"dia":int,"hr":int_or_null}'}]}]})});
+    const res=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:'Extract blood pressure from this image. Return ONLY JSON: {"sys":int,"dia":int,"hr":int_or_null}'}]}]})});
     const data=await res.json();
     const txt=data.content?.find(b=>b.type==='text')?.text||'';
     const parsed=JSON.parse(txt.trim());
@@ -1040,10 +1083,37 @@ function renderProfile(){
   ].filter(Boolean);
   const pi=(l,v)=>`<div class="pi"><div class="pi-l">${l}</div><div class="pi-v">${v||'—'}</div></div>`;
   document.getElementById('prof-content').innerHTML=`
-    <div class="prof-hero"><div class="prof-av">${ini}</div><div><div class="prof-name">${p.name}</div><div class="prof-sub">${[p.age?p.age+' yrs':null,p.sex,bmi?'BMI '+bmi:null].filter(Boolean).join(' · ')}</div></div></div>
-    <div class="card"><div class="ctitle">Personal</div><div class="pgrid">${pi('Age',p.age?p.age+' years':null)}${pi('Sex',p.sex)}${pi('Weight',p.weight?p.weight+' kg':null)}${pi('Height',p.height?p.height+' cm':null)}${bmi?pi('BMI',bmi):''}${pi('Blood type',p.bloodType)}</div></div>
-    <div class="card"><div class="ctitle">Lifestyle</div><div class="pgrid">${pi('Diet',p.diet)}${pi('Exercise',p.exercise)}${pi('Salt intake',p.salt)}${pi('Sleep',p.sleep)}${pi('Stress',p.stress)}</div></div>
-    ${risks.length?`<div class="card"><div class="ctitle">Risk factors</div><div>${risks.map(r=>`<span class="risk-tag" style="background:${r.b};color:${r.c}">${r.t}</span>`).join('')}</div></div>`:''}`;
+    <div class="prof-hero"><div class="prof-av">${esc(ini)}</div><div><div class="prof-name">${esc(p.name)}</div><div class="prof-sub">${[p.age?esc(p.age)+' yrs':null,esc(p.sex),bmi?'BMI '+bmi:null].filter(Boolean).join(' · ')}</div></div></div>
+    <div class="card"><div class="ctitle">Personal</div><div class="pgrid">${pi('Age',p.age?esc(p.age)+' years':null)}${pi('Sex',esc(p.sex))}${pi('Weight',p.weight?esc(p.weight)+' kg':null)}${pi('Height',p.height?esc(p.height)+' cm':null)}${bmi?pi('BMI',bmi):''}${pi('Blood type',esc(p.bloodType))}</div></div>
+    <div class="card"><div class="ctitle">Lifestyle</div><div class="pgrid">${pi('Diet',esc(p.diet))}${pi('Exercise',esc(p.exercise))}${pi('Salt intake',esc(p.salt))}${pi('Sleep',esc(p.sleep))}${pi('Stress',esc(p.stress))}</div></div>
+    ${risks.length?`<div class="card"><div class="ctitle">Risk factors</div><div>${risks.map(r=>`<span class="risk-tag" style="background:${r.b};color:${r.c}">${esc(r.t)}</span>`).join('')}</div></div>`:''}`;
+}
+function saveApiKey(){
+  const key = document.getElementById('api-key-input').value.trim();
+  if(!key){alert('Please enter an API key.');return;}
+  if(!key.startsWith('sk-ant-')){alert('That doesn\'t look like an Anthropic API key. It should start with sk-ant-');return;}
+  localStorage.setItem('bp_apikey', key);
+  document.getElementById('api-key-input').value='';
+  updateApiKeyStatus();
+  alert('API key saved. Screenshot scanning is now active.');
+}
+function clearApiKey(){
+  if(!confirm('Remove the saved API key? Screenshot scanning will stop working.'))return;
+  localStorage.removeItem('bp_apikey');
+  updateApiKeyStatus();
+}
+function updateApiKeyStatus(){
+  const el=document.getElementById('api-key-status');
+  if(!el)return;
+  const key=localStorage.getItem('bp_apikey');
+  if(API_PROXY){
+    el.innerHTML='<span style="color:var(--ok)">✓ Using Cloudflare Worker proxy — secure for public use.</span>';
+  } else if(key){
+    const masked='sk-ant-···'+key.slice(-6);
+    el.innerHTML=`<span style="color:var(--ok)">✓ API key saved (${masked}). Scanning active.</span>`;
+  } else {
+    el.innerHTML='<span style="color:var(--s2)">✗ No API key set. Enter your key below to enable scanning.</span>';
+  }
 }
 function editProfile(){WS=0;renderWS();showScreen('wizard');}
 
@@ -1087,7 +1157,7 @@ function printReport(){
   document.getElementById('print-report').innerHTML=`
     <div class="pr-header">
       <div class="pr-title">Blood Pressure Report</div>
-      <div class="pr-patient">${p?p.name+' · '+[p.age?'Age '+p.age:null,p.sex,p.weight?p.weight+'kg':null].filter(Boolean).join(', ')+'<br>':''}Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · ${all.length} total readings</div>
+      <div class="pr-patient">${p?esc(p.name)+' · '+[p.age?'Age '+esc(p.age):null,esc(p.sex),p.weight?esc(p.weight)+'kg':null].filter(Boolean).join(', ')+'<br>':''}Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · ${all.length} total readings</div>
     </div>
     <div class="pr-section">
       <h3>Key Metrics</h3>
@@ -1113,13 +1183,13 @@ function printReport(){
       <div class="pr-section">
         <h3>Health Profile</h3>
         ${p?`<table class="pr-table"><tbody>
-          ${p.diet?`<tr><td>Diet</td><td>${p.diet}</td></tr>`:''}
-          ${p.exercise?`<tr><td>Exercise</td><td>${p.exercise}</td></tr>`:''}
-          ${p.smoking?`<tr><td>Smoking</td><td>${p.smoking}</td></tr>`:''}
-          ${p.drinking?`<tr><td>Alcohol</td><td>${p.drinking}</td></tr>`:''}
-          ${p.bpMed?`<tr><td>BP Medication</td><td>${p.bpMed}</td></tr>`:''}
-          ${p.family?`<tr><td>Family history</td><td>${p.family}</td></tr>`:''}
-          ${(p.conditions||[]).filter(c=>c!=='None').length?`<tr><td>Conditions</td><td>${(p.conditions||[]).filter(c=>c!=='None').join(', ')}</td></tr>`:''}
+          ${p.diet?`<tr><td>Diet</td><td>${esc(p.diet)}</td></tr>`:''}
+          ${p.exercise?`<tr><td>Exercise</td><td>${esc(p.exercise)}</td></tr>`:''}
+          ${p.smoking?`<tr><td>Smoking</td><td>${esc(p.smoking)}</td></tr>`:''}
+          ${p.drinking?`<tr><td>Alcohol</td><td>${esc(p.drinking)}</td></tr>`:''}
+          ${p.bpMed?`<tr><td>BP Medication</td><td>${esc(p.bpMed)}</td></tr>`:''}
+          ${p.family?`<tr><td>Family history</td><td>${esc(p.family)}</td></tr>`:''}
+          ${(p.conditions||[]).filter(c=>c!=='None').length?`<tr><td>Conditions</td><td>${esc((p.conditions||[]).filter(c=>c!=='None').join(', '))}</td></tr>`:''}
         </tbody></table>`:'<p>No profile data.</p>'}
       </div>
     </div>
@@ -1137,10 +1207,10 @@ function printReport(){
 }
 
 /* ── SEED DEMO DATA ── */
-(function seedDemo(){
+async function seedDemo(){
   const uid='u_test';
   const users=DB.users().filter(u=>u.u!=='demo');
-  users.push({id:uid,u:'demo',p:hsh('test1234')});
+  users.push({id:uid,u:'demo',p:await hsh('test1234')});
   DB.saveUsers(users);
   if(!DB.profile(uid)){
     DB.saveProfile(uid,{name:'James Odhiambo',age:'47',sex:'Male',weight:'84',height:'172',bloodType:'O+',diet:'Omnivore',exercise:'1–2× / week',salt:'Moderate',sleep:'5–6 hrs',stress:'High',smoking:'Non-smoker',smokingFreq:null,drinking:'Occasional',drinkingFreq:'1–3',conditions:['High cholesterol'],bpMed:'No',family:'Yes',at:new Date().toISOString()});
@@ -1191,8 +1261,8 @@ function printReport(){
     });
     DB.saveReadings(uid,data);
   }
-  UID=uid;DB.setSession(uid);
-})();
+  /* No auto-login — user must sign in with demo / test1234 */
+};
 
 /* ── INIT ── */
 function refreshAll(){
@@ -1204,7 +1274,8 @@ function refreshAll(){
   const cnt=DB.readings(UID||'').length;
   document.getElementById('rc').textContent=cnt+' reading'+(cnt!==1?'s':'');
 }
-(function init(){
+(async function init(){
+  await seedDemo();
   if(UID){afterLogin();return;}
   const uid=DB.session();
   if(uid&&DB.users().find(u=>u.id===uid)){UID=uid;afterLogin();}
