@@ -242,11 +242,47 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);min-height:100
 }
 #print-report{display:none;}
 
-@media(max-width:520px){
-  .stats4,.stats6{grid-template-columns:repeat(2,1fr);}
-  .avgs2,.row2,.row3,.pgrid,.insights-grid{grid-template-columns:1fr;}
-  .hdr{padding:0 16px;}
-  .page,.wiz-wrap{padding:16px;}
+@media(max-width:640px){
+  .page{padding:12px;}
+  .wiz-wrap{padding:12px;}
+  .card{padding:14px 16px;margin-bottom:12px;}
+  .hdr{padding:0 12px;height:50px;}
+  .hdr-l h1{font-size:17px;}
+  .hdr-l span{display:none;}
+  .tabs{padding:0 8px;}
+  .tab{padding:10px 10px;font-size:12px;}
+  .icon-btn .btn-txt{display:none;}
+  .icon-btn{padding:6px 9px;}
+  .stats4{grid-template-columns:repeat(2,1fr);}
+  .stats6{grid-template-columns:repeat(2,1fr);}
+  .avgs2{grid-template-columns:1fr;}
+  .row2{grid-template-columns:1fr;}
+  .pgrid{grid-template-columns:1fr 1fr;}
+  .insights-grid{grid-template-columns:1fr;}
+  .wiz-box{padding:20px 16px;}
+  .pill{padding:8px 14px;font-size:13px;}
+  .tag-pill{padding:7px 13px;font-size:12px;}
+  .cpill{padding:8px 12px;}
+  .btn-primary{padding:13px;}
+  .btn-outline{padding:12px;}
+  .htable-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .htable{min-width:480px;}
+  .s-val{font-size:18px;}
+  .stat-card{padding:12px;}
+  .metrics-row{grid-template-columns:1fr 1fr;}
+  .scan-thumb{width:56px;height:56px;}
+  .big-input{font-size:20px !important;}
+  .prof-hero{flex-direction:column;text-align:center;gap:10px;}
+  .prof-av{width:44px;height:44px;font-size:15px;}
+  .a-val{font-size:22px;}
+  .insight-card{padding:12px;}
+  .i-val{font-size:18px;}
+  .wiz-nav{flex-direction:column-reverse;}
+  .wiz-nav .btn-primary{margin-top:0 !important;}
+  .avg-card{padding:12px 14px;}
+  .ctitle{margin-bottom:10px;}
+  .sh{flex-wrap:wrap;gap:8px;}
+  .auth-box{padding:28px 20px;}
 }
 </style>
 </head>
@@ -416,11 +452,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);min-height:100
     <div class="hdr-r">
       <button class="icon-btn" onclick="printReport()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        Doctor PDF
+        <span class="btn-txt">Doctor PDF</span>
       </button>
       <button class="icon-btn" onclick="exportCSV()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        CSV
+        <span class="btn-txt">CSV</span>
       </button>
       <div class="user-chip" onclick="goTab('profile')">
         <div class="avatar" id="hav">?</div>
@@ -803,13 +839,13 @@ function renderHistory(){
   if(hf!=='all'){const c=Date.now()-hf*864e5;data=data.filter(r=>new Date(r.time)>c);}
   const el=document.getElementById('hist-content');
   if(!data.length){el.innerHTML='<div class="empty">No readings yet.</div>';return;}
-  el.innerHTML=`<table class="htable"><thead><tr><th>Date/Time</th><th>BP</th><th>HR</th><th>PP</th><th>MAP</th><th>Category</th><th>Tags</th><th></th></tr></thead><tbody>${data.map(r=>{
+  el.innerHTML=`<div class="htable-wrap"><table class="htable"><thead><tr><th>Date/Time</th><th>BP</th><th>HR</th><th class="hide-mobile">PP</th><th class="hide-mobile">MAP</th><th>Category</th><th class="hide-mobile">Tags</th><th></th></tr></thead><tbody>${data.map(r=>{
     const cat=classify(r.sys,r.dia);
     const pval=(r.pp!==undefined?r.pp:pp(r.sys,r.dia));
     const mval=(r.map!==undefined?r.map:map(r.sys,r.dia));
     const tgs=(r.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('');
-    return`<tr><td style="color:var(--muted);font-size:12px">${fmtDT(r.time)}</td><td><span class="bp-val">${r.sys}/${r.dia}</span></td><td style="color:var(--muted)">${r.hr?r.hr+' bpm':'—'}</td><td style="color:var(--muted)">${pval}</td><td style="color:var(--muted)">${mval}</td><td>${cat?`<span class="badge ${cat.c}">${cat.l}</span>`:''}</td><td>${tgs||'<span style="color:var(--hint);font-size:11px">—</span>'}</td><td><button class="del-btn" onclick="delReading(${r.id})">×</button></td></tr>`;
-  }).join('')}</tbody></table>`;
+    return`<tr><td style="color:var(--muted);font-size:12px">${fmtDT(r.time)}</td><td><span class="bp-val">${r.sys}/${r.dia}</span></td><td style="color:var(--muted)">${r.hr?r.hr+' bpm':'—'}</td><td class="hide-mobile" style="color:var(--muted)">${pval}</td><td class="hide-mobile" style="color:var(--muted)">${mval}</td><td>${cat?`<span class="badge ${cat.c}">${cat.l}</span>`:''}</td><td class="hide-mobile">${tgs||'<span style="color:var(--hint);font-size:11px">—</span>'}</td><td><button class="del-btn" onclick="delReading(${r.id})">×</button></td></tr>`;
+  }).join('')}</tbody></table></div>`;
 }
 function renderRecent(){
   const data=DB.readings(UID).slice(0,3);
