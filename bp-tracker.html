@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BP Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#f7f6f3;--surface:#fff;--surface2:#f0efeb;
+  --border:rgba(0,0,0,0.09);--border-s:rgba(0,0,0,0.18);
+  --text:#1a1a18;--muted:#6b6a65;--hint:#9b9a96;
+  --accent:#c0392b;--accent-l:#fdecea;
+  --r:10px;--rl:14px;
+  --ok:#16a34a;--ok-bg:#f0fdf4;
+  --el:#ca8a04;--el-bg:#fefce8;
+  --s1:#ea580c;--s1-bg:#fff7ed;
+  --s2:#dc2626;--s2-bg:#fef2f2;
+  --cr:#7f1d1d;--cr-bg:#fef2f2;
+  --info:#1d4ed8;--info-bg:#eff6ff;
+  --warn:#92400e;--warn-bg:#fffbeb;
+  --font:'Georgia',serif;--ui:system-ui,-apple-system,sans-serif;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#141412;--surface:#1e1d1a;--surface2:#272622;
+  --border:rgba(255,255,255,0.09);--border-s:rgba(255,255,255,0.18);
+  --text:#f0ede8;--muted:#9b9994;--hint:#6b6a66;
+  --accent-l:#3d1210;--ok-bg:#052e16;--el-bg:#422006;
+  --s1-bg:#431407;--s2-bg:#450a0a;--cr-bg:#3d0000;
+  --info-bg:#1e3a5f;--warn-bg:#451a03;
+}}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--ui);min-height:100vh;}
+.screen{display:none;min-height:100vh;}.screen.active{display:block;}
+
+/* ── AUTH ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.auth-box{background:var(--surface);border:0.5px solid var(--border-s);border-radius:var(--rl);padding:36px 32px;width:100%;max-width:380px;}
+.auth-logo{text-align:center;margin-bottom:28px;}
+.auth-logo h1{font-family:var(--font);font-size:26px;font-weight:normal;letter-spacing:-0.5px;}
+.auth-logo p{font-size:13px;color:var(--hint);margin-top:4px;}
+.switch-link{text-align:center;margin-top:18px;font-size:13px;color:var(--muted);}
+.switch-link a{color:var(--accent);cursor:pointer;}
+.switch-link a:hover{text-decoration:underline;}
+
+/* ── WIZARD ── */
+.wiz-wrap{min-height:100vh;background:var(--bg);padding:32px 24px;display:flex;flex-direction:column;align-items:center;}
+.wiz-box{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rl);padding:28px;width:100%;max-width:560px;}
+.wiz-hdr{margin-bottom:20px;}
+.wiz-hdr h2{font-family:var(--font);font-size:20px;font-weight:normal;margin-bottom:4px;}
+.wiz-hdr p{font-size:13px;color:var(--muted);}
+.step-dots{display:flex;gap:6px;margin-bottom:16px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border-s);}
+.dot.on{background:var(--accent);}.dot.done{background:var(--ok);}
+.wstep{display:none;}.wstep.active{display:block;}
+.wiz-nav{display:flex;gap:10px;margin-top:24px;}
+
+/* ── COMMON FORM ── */
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.fg label{font-size:12px;color:var(--muted);font-weight:500;}
+.fg input,.fg select{background:var(--surface2);border:0.5px solid var(--border-s);border-radius:7px;padding:10px 12px;font-size:14px;font-family:var(--ui);color:var(--text);width:100%;}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.pill-lbl{font-size:12px;color:var(--muted);font-weight:500;margin-bottom:6px;display:block;}
+.pills{display:flex;flex-wrap:wrap;gap:8px;}
+.pill{padding:6px 13px;border:0.5px solid var(--border-s);border-radius:20px;font-size:13px;cursor:pointer;background:var(--surface2);color:var(--muted);transition:all 0.12s;user-select:none;}
+.pill.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.cpill{display:flex;align-items:center;gap:6px;padding:6px 12px;border:0.5px solid var(--border-s);border-radius:20px;font-size:13px;cursor:pointer;background:var(--surface2);color:var(--muted);user-select:none;}
+.cpill.on{background:var(--accent-l);color:var(--accent);border-color:var(--accent);}
+.chk{width:14px;height:14px;border-radius:3px;border:0.5px solid var(--border-s);background:var(--surface);display:inline-block;flex-shrink:0;position:relative;}
+.cpill.on .chk::after{content:'✓';position:absolute;top:-2px;left:1px;font-size:11px;color:var(--accent);}
+.sub-field{margin-top:10px;padding:12px;background:var(--surface2);border-radius:var(--r);display:none;}
+.sub-field.show{display:block;}
+.err{font-size:12px;color:var(--accent);display:none;margin-top:4px;}
+
+/* TAG pills in log form */
+.tag-pill{padding:5px 12px;border:0.5px solid var(--border-s);border-radius:20px;font-size:12px;cursor:pointer;background:var(--surface2);color:var(--muted);user-select:none;transition:all 0.12s;}
+.tag-pill.on{background:var(--info-bg);color:var(--info);border-color:var(--info);}
+
+/* ── BUTTONS ── */
+.btn-primary{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-size:14px;font-family:var(--ui);font-weight:500;cursor:pointer;transition:opacity 0.15s;}
+.btn-primary:hover{opacity:0.88;}.btn-primary:active{transform:scale(0.99);}
+.btn-outline{padding:10px 18px;background:none;border:0.5px solid var(--border-s);border-radius:var(--r);font-size:13px;font-family:var(--ui);color:var(--muted);cursor:pointer;transition:background 0.12s;}
+.btn-outline:hover{background:var(--surface2);}
+.btn-danger{color:var(--accent);border-color:var(--accent);}
+.btn-full{width:100%;margin-top:8px;}
+
+/* ── MAIN HEADER ── */
+.hdr{background:var(--surface);border-bottom:0.5px solid var(--border-s);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:10;}
+.hdr-l{display:flex;align-items:baseline;gap:10px;}
+.hdr-l h1{font-family:var(--font);font-size:20px;font-weight:normal;letter-spacing:-0.3px;}
+.hdr-l span{font-size:12px;color:var(--hint);}
+.hdr-r{display:flex;align-items:center;gap:8px;}
+.icon-btn{background:none;border:0.5px solid var(--border-s);border-radius:6px;padding:6px 11px;font-size:13px;color:var(--muted);cursor:pointer;font-family:var(--ui);display:flex;align-items:center;gap:5px;transition:background 0.15s;}
+.icon-btn:hover{background:var(--surface2);}
+.user-chip{display:flex;align-items:center;gap:7px;padding:4px 10px 4px 6px;border:0.5px solid var(--border);border-radius:20px;cursor:pointer;font-size:13px;color:var(--muted);background:var(--surface2);}
+.avatar{width:24px;height:24px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--accent);}
+
+/* ── TABS ── */
+.tabs{display:flex;background:var(--surface);border-bottom:0.5px solid var(--border);padding:0 24px;overflow-x:auto;}
+.tab{padding:12px 15px;font-size:13px;font-family:var(--ui);color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;white-space:nowrap;transition:color 0.15s;}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.tab:hover:not(.on){color:var(--text);}
+
+/* ── PAGES ── */
+.page{display:none;padding:24px;max-width:800px;margin:0 auto;}
+.page.on{display:block;}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rl);padding:20px 24px;margin-bottom:16px;}
+.ctitle{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.8px;color:var(--hint);margin-bottom:14px;}
+
+/* ── LOG TAB ── */
+.upload-zone{border:1.5px dashed var(--border-s);border-radius:var(--rl);padding:22px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;margin-bottom:14px;position:relative;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-l);}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.scan-wrap{display:none;margin-bottom:14px;}
+.scan-wrap.show{display:block;}
+.scan-prev{display:flex;align-items:flex-start;gap:14px;background:var(--surface2);border-radius:var(--r);padding:12px 14px;}
+.scan-thumb{width:68px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0;border:0.5px solid var(--border-s);}
+.scan-info{flex:1;}
+.scan-status{font-size:13px;font-weight:500;margin-bottom:3px;}
+.scan-sub{font-size:12px;color:var(--muted);}
+.scan-reset{background:none;border:0.5px solid var(--border-s);border-radius:5px;padding:4px 9px;font-size:12px;color:var(--muted);cursor:pointer;font-family:var(--ui);margin-top:6px;display:inline-block;}
+.divider{display:flex;align-items:center;gap:10px;margin:14px 0;}
+.divider::before,.divider::after{content:'';flex:1;height:0.5px;background:var(--border-s);}
+.divider span{font-size:11px;color:var(--hint);white-space:nowrap;}
+.big-input{font-size:22px !important;font-family:var(--font) !important;text-align:center;-moz-appearance:textfield;}
+.big-input::-webkit-outer-spin-button,.big-input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.unit{font-size:11px;color:var(--hint);text-align:center;display:block;margin-top:2px;}
+.bp-prev{background:var(--surface2);border-radius:var(--r);padding:14px 16px;margin-top:14px;}
+.bp-prev-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.bp-main{font-family:var(--font);font-size:28px;font-weight:normal;letter-spacing:-1px;}
+.metrics-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.metric-box{background:var(--surface);border-radius:7px;padding:8px 12px;}
+.metric-lbl{font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:0.5px;}
+.metric-val{font-size:15px;font-family:var(--font);}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border-s);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:5px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── BADGES ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;white-space:nowrap;}
+.b-ok{background:var(--ok-bg);color:var(--ok);}
+.b-el{background:var(--el-bg);color:var(--el);}
+.b-s1{background:var(--s1-bg);color:var(--s1);}
+.b-s2{background:var(--s2-bg);color:var(--s2);}
+.b-cr{background:var(--cr-bg);color:var(--cr);}
+.b-info{background:var(--info-bg);color:var(--info);}
+.b-warn{background:var(--warn-bg);color:var(--warn);}
+.tag-badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;background:var(--info-bg);color:var(--info);margin:1px;}
+
+/* ── ALERTS ── */
+.alert{border-radius:var(--r);padding:13px 16px;margin-bottom:12px;border:0.5px solid;}
+.alert-warn{background:var(--warn-bg);border-color:#f59e0b;color:var(--warn);}
+.alert-danger{background:var(--s2-bg);border-color:#ef4444;color:var(--s2);}
+.alert-info{background:var(--info-bg);border-color:#3b82f6;color:var(--info);}
+.alert-ok{background:var(--ok-bg);border-color:#22c55e;color:var(--ok);}
+.alert-title{font-size:13px;font-weight:500;margin-bottom:3px;}
+.alert-body{font-size:12px;opacity:0.85;}
+.dismiss{float:right;background:none;border:none;font-size:16px;cursor:pointer;color:inherit;margin-left:8px;line-height:1;}
+
+/* ── STATS ── */
+.stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.stats6{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.stat-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:14px 16px;text-align:center;}
+.s-lbl{font-size:11px;color:var(--hint);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;}
+.s-val{font-family:var(--font);font-size:22px;font-weight:normal;line-height:1;}
+.s-sub{font-size:11px;color:var(--hint);margin-top:2px;}
+.s-val.danger{color:var(--s2);}
+.s-val.ok{color:var(--ok);}
+
+/* ── HISTORY TABLE ── */
+.htable{width:100%;border-collapse:collapse;font-size:13px;}
+.htable th{text-align:left;padding:8px 10px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.6px;color:var(--hint);border-bottom:0.5px solid var(--border);}
+.htable td{padding:9px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle;}
+.htable tr:last-child td{border-bottom:none;}
+.htable tr:hover td{background:var(--surface2);}
+.del-btn{background:none;border:none;color:var(--hint);cursor:pointer;padding:2px 5px;font-size:15px;line-height:1;}
+.del-btn:hover{color:var(--accent);}
+.bp-val{font-family:var(--font);font-size:14px;}
+.empty{text-align:center;padding:40px;color:var(--hint);font-size:14px;}
+
+/* ── CHARTS ── */
+.chart-wrap{position:relative;width:100%;height:260px;}
+.chart-sm{position:relative;width:100%;height:200px;}
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.st{font-size:13px;font-weight:500;color:var(--muted);}
+.ptoggle{display:flex;gap:4px;}
+.pbtn{padding:4px 10px;font-size:12px;font-family:var(--ui);border:0.5px solid var(--border-s);border-radius:5px;background:none;color:var(--muted);cursor:pointer;}
+.pbtn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.legend{display:flex;gap:14px;margin-bottom:8px;flex-wrap:wrap;}
+.li{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);}
+.ld{width:10px;height:10px;border-radius:2px;}
+.avgs2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.avg-card{background:var(--surface2);border-radius:var(--r);padding:14px 16px;}
+.a-lbl{font-size:11px;color:var(--hint);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;}
+.a-val{font-family:var(--font);font-size:26px;font-weight:normal;letter-spacing:-0.5px;}
+.a-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+/* ── INSIGHTS ── */
+.insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.insight-card{background:var(--surface2);border-radius:var(--r);padding:14px 16px;border-left:3px solid var(--border-s);}
+.insight-card.up{border-left-color:var(--s2);}
+.insight-card.down{border-left-color:var(--ok);}
+.insight-card.neutral{border-left-color:var(--el);}
+.i-lbl{font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.i-val{font-size:20px;font-family:var(--font);}
+.i-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+/* ── PROFILE ── */
+.prof-hero{background:var(--accent-l);border:0.5px solid var(--border);border-radius:var(--rl);padding:20px 24px;margin-bottom:14px;display:flex;align-items:center;gap:16px;}
+.prof-av{width:52px;height:52px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;flex-shrink:0;}
+.prof-name{font-size:18px;font-family:var(--font);}
+.prof-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.pi{background:var(--surface2);border-radius:var(--r);padding:12px 14px;}
+.pi-l{font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;}
+.pi-v{font-size:14px;}
+.risk-tag{display:inline-block;margin:3px;padding:4px 10px;border-radius:12px;font-size:12px;}
+
+/* ── PRINT / PDF ── */
+@media print{
+  body>*{display:none !important;}
+  #print-report{display:block !important;}
+  #print-report{font-family:Arial,sans-serif;font-size:11pt;color:#000;padding:0;margin:0;}
+  .pr-header{border-bottom:2px solid #c0392b;padding-bottom:10px;margin-bottom:14px;}
+  .pr-title{font-size:18pt;font-weight:bold;color:#c0392b;}
+  .pr-patient{font-size:10pt;color:#555;margin-top:4px;}
+  .pr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .pr-stat{border:1px solid #ddd;border-radius:6px;padding:10px;text-align:center;}
+  .pr-stat-lbl{font-size:8pt;color:#888;text-transform:uppercase;letter-spacing:0.5px;}
+  .pr-stat-val{font-size:16pt;font-weight:bold;margin-top:2px;}
+  .pr-section{margin-bottom:14px;}
+  .pr-section h3{font-size:11pt;color:#c0392b;border-bottom:0.5px solid #ddd;padding-bottom:4px;margin-bottom:8px;}
+  .pr-table{width:100%;border-collapse:collapse;font-size:9pt;}
+  .pr-table th{text-align:left;padding:5px 8px;background:#f5f5f5;border:0.5px solid #ddd;}
+  .pr-table td{padding:4px 8px;border:0.5px solid #ddd;}
+  .pr-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .pr-insights{font-size:10pt;background:#fff8f0;border:1px solid #f59e0b;border-radius:6px;padding:10px;margin-bottom:10px;}
+  .pr-canvas-wrap{text-align:center;margin-bottom:8px;}
+  .pr-canvas-wrap img{max-width:100%;height:auto;}
+  .no-print{display:none !important;}
+}
+#print-report{display:none;}
+
+@media(max-width:520px){
+  .stats4,.stats6{grid-template-columns:repeat(2,1fr);}
+  .avgs2,.row2,.row3,.pgrid,.insights-grid{grid-template-columns:1fr;}
+  .hdr{padding:0 16px;}
+  .page,.wiz-wrap{padding:16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PRINT REPORT (hidden, shown only on print) ═══════════ -->
+<div id="print-report"></div>
+
+<!-- ═══════════ LOGIN ═══════════ -->
+<div class="screen active" id="screen-login">
+  <div class="auth-wrap"><div class="auth-box">
+    <div class="auth-logo"><h1>BP Tracker</h1><p>Your personal blood pressure journal</p></div>
+    <div id="login-form">
+      <div class="fg"><label>Username</label><input type="text" id="lu" placeholder="Enter username" autocomplete="username"></div>
+      <div class="fg"><label>Password</label><input type="password" id="lp" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="err" id="lerr">Incorrect username or password.</div>
+      <button class="btn-primary" onclick="doLogin()" style="margin-top:12px">Sign In</button>
+      <div class="switch-link">No account? <a onclick="showReg()">Create one</a></div>
+    </div>
+    <div id="reg-form" style="display:none">
+      <div class="fg"><label>Username</label><input type="text" id="ru" placeholder="Choose a username" autocomplete="username"></div>
+      <div class="fg"><label>Password</label><input type="password" id="rp" placeholder="At least 6 characters" autocomplete="new-password"></div>
+      <div class="fg"><label>Confirm password</label><input type="password" id="rp2" placeholder="Repeat password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <div class="err" id="rerr"></div>
+      <button class="btn-primary" onclick="doRegister()" style="margin-top:12px">Create Account</button>
+      <div class="switch-link">Have an account? <a onclick="showLogin()">Sign in</a></div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══════════ WIZARD ═══════════ -->
+<div class="screen" id="screen-wizard">
+  <div class="wiz-wrap"><div class="wiz-box">
+    <div class="wiz-hdr">
+      <div class="step-dots" id="wdots"></div>
+      <h2 id="wtitle"></h2><p id="wsub"></p>
+    </div>
+    <!-- Step 0 -->
+    <div class="wstep active" id="ws0">
+      <div class="fg"><label>Full name</label><input type="text" id="wname" placeholder="Your name"></div>
+      <div class="row2">
+        <div class="fg"><label>Age</label><input type="number" id="wage" placeholder="e.g. 42" min="1" max="120"></div>
+        <div class="fg"><label>Biological sex</label>
+          <select id="wsex"><option value="">Select</option><option>Male</option><option>Female</option><option>Other / prefer not to say</option></select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Weight (kg)</label><input type="number" id="wweight" placeholder="e.g. 75"></div>
+        <div class="fg"><label>Height (cm)</label><input type="number" id="wheight" placeholder="e.g. 170"></div>
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <span class="pill-lbl">Blood type (optional)</span>
+        <div class="pills" id="pblood">
+          <span class="pill" onclick="tp(this,'pblood',1)">A+</span><span class="pill" onclick="tp(this,'pblood',1)">A−</span>
+          <span class="pill" onclick="tp(this,'pblood',1)">B+</span><span class="pill" onclick="tp(this,'pblood',1)">B−</span>
+          <span class="pill" onclick="tp(this,'pblood',1)">O+</span><span class="pill" onclick="tp(this,'pblood',1)">O−</span>
+          <span class="pill" onclick="tp(this,'pblood',1)">AB+</span><span class="pill" onclick="tp(this,'pblood',1)">AB−</span>
+          <span class="pill" onclick="tp(this,'pblood',1)">Unknown</span>
+        </div>
+      </div>
+    </div>
+    <!-- Step 1 -->
+    <div class="wstep" id="ws1">
+      <div style="margin-bottom:16px"><span class="pill-lbl">Diet</span>
+        <div class="pills" id="pdiet">
+          <span class="pill" onclick="tp(this,'pdiet',1)">Omnivore</span><span class="pill" onclick="tp(this,'pdiet',1)">Vegetarian</span>
+          <span class="pill" onclick="tp(this,'pdiet',1)">Vegan</span><span class="pill" onclick="tp(this,'pdiet',1)">Pescatarian</span>
+          <span class="pill" onclick="tp(this,'pdiet',1)">Keto / Low-carb</span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px"><span class="pill-lbl">Exercise frequency</span>
+        <div class="pills" id="pex">
+          <span class="pill" onclick="tp(this,'pex',1)">Sedentary</span><span class="pill" onclick="tp(this,'pex',1)">1–2× / week</span>
+          <span class="pill" onclick="tp(this,'pex',1)">3–4× / week</span><span class="pill" onclick="tp(this,'pex',1)">5+ × / week</span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px"><span class="pill-lbl">Daily salt intake</span>
+        <div class="pills" id="psalt">
+          <span class="pill" onclick="tp(this,'psalt',1)">Low</span><span class="pill" onclick="tp(this,'psalt',1)">Moderate</span><span class="pill" onclick="tp(this,'psalt',1)">High</span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px"><span class="pill-lbl">Average sleep per night</span>
+        <div class="pills" id="psleep">
+          <span class="pill" onclick="tp(this,'psleep',1)">Less than 5 hrs</span><span class="pill" onclick="tp(this,'psleep',1)">5–6 hrs</span>
+          <span class="pill" onclick="tp(this,'psleep',1)">7–8 hrs</span><span class="pill" onclick="tp(this,'psleep',1)">9+ hrs</span>
+        </div>
+      </div>
+      <div style="margin-bottom:0"><span class="pill-lbl">Typical stress level</span>
+        <div class="pills" id="pstress">
+          <span class="pill" onclick="tp(this,'pstress',1)">Low</span><span class="pill" onclick="tp(this,'pstress',1)">Moderate</span>
+          <span class="pill" onclick="tp(this,'pstress',1)">High</span><span class="pill" onclick="tp(this,'pstress',1)">Very high</span>
+        </div>
+      </div>
+    </div>
+    <!-- Step 2 -->
+    <div class="wstep" id="ws2">
+      <div style="margin-bottom:16px"><span class="pill-lbl">Do you smoke?</span>
+        <div class="pills" id="psmoke">
+          <span class="pill" onclick="tp(this,'psmoke',1);showSub('ssub',false)">Non-smoker</span>
+          <span class="pill" onclick="tp(this,'psmoke',1);showSub('ssub',false)">Former smoker</span>
+          <span class="pill" onclick="tp(this,'psmoke',1);showSub('ssub',true)">Current smoker</span>
+        </div>
+        <div class="sub-field" id="ssub">
+          <span class="pill-lbl">How much per day?</span>
+          <div class="pills" id="psfreq">
+            <span class="pill" onclick="tp(this,'psfreq',1)">Occasional (&lt;5)</span>
+            <span class="pill" onclick="tp(this,'psfreq',1)">Moderate (5–15)</span>
+            <span class="pill" onclick="tp(this,'psfreq',1)">Heavy (15+)</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-bottom:16px"><span class="pill-lbl">Do you drink alcohol?</span>
+        <div class="pills" id="pdrink">
+          <span class="pill" onclick="tp(this,'pdrink',1);showSub('dsub',false)">Non-drinker</span>
+          <span class="pill" onclick="tp(this,'pdrink',1);showSub('dsub',true)">Occasional</span>
+          <span class="pill" onclick="tp(this,'pdrink',1);showSub('dsub',true)">Regular</span>
+          <span class="pill" onclick="tp(this,'pdrink',1);showSub('dsub',true)">Heavy</span>
+        </div>
+        <div class="sub-field" id="dsub">
+          <span class="pill-lbl">Typical weekly drinks?</span>
+          <div class="pills" id="pdfreq">
+            <span class="pill" onclick="tp(this,'pdfreq',1)">1–3</span><span class="pill" onclick="tp(this,'pdfreq',1)">4–7</span>
+            <span class="pill" onclick="tp(this,'pdfreq',1)">8–14</span><span class="pill" onclick="tp(this,'pdfreq',1)">14+</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-bottom:16px"><span class="pill-lbl">Existing conditions</span>
+        <div class="pills" id="pcond" style="gap:7px">
+          <span class="cpill" onclick="tcp(this)"><span class="chk"></span>Diabetes</span>
+          <span class="cpill" onclick="tcp(this)"><span class="chk"></span>Heart disease</span>
+          <span class="cpill" onclick="tcp(this)"><span class="chk"></span>Kidney disease</span>
+          <span class="cpill" onclick="tcp(this)"><span class="chk"></span>High cholesterol</span>
+          <span class="cpill" onclick="tcp(this)"><span class="chk"></span>Sleep apnoea</span>
+          <span class="cpill" onclick="tcp(this)"><span class="chk"></span>Thyroid disorder</span>
+          <span class="cpill" onclick="tcp(this)"><span class="chk"></span>None</span>
+        </div>
+      </div>
+      <div class="row2" style="margin-bottom:0">
+        <div><span class="pill-lbl">On BP medication?</span>
+          <div class="pills" id="pbpmed">
+            <span class="pill" onclick="tp(this,'pbpmed',1)">Yes</span><span class="pill" onclick="tp(this,'pbpmed',1)">No</span>
+          </div>
+        </div>
+        <div><span class="pill-lbl">Family history of hypertension?</span>
+          <div class="pills" id="pfamily">
+            <span class="pill" onclick="tp(this,'pfamily',1)">Yes</span><span class="pill" onclick="tp(this,'pfamily',1)">No</span>
+            <span class="pill" onclick="tp(this,'pfamily',1)">Unknown</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="wiz-nav">
+      <button class="btn-outline" id="wback" onclick="wBack()" style="display:none">← Back</button>
+      <button class="btn-primary" id="wnext" onclick="wNext()" style="flex:1;margin-top:0">Continue →</button>
+    </div>
+    <p id="werr" style="font-size:12px;color:var(--accent);text-align:center;margin-top:8px;min-height:16px"></p>
+  </div></div>
+</div>
+
+<!-- ═══════════ MAIN APP ═══════════ -->
+<div class="screen" id="screen-app">
+  <div class="hdr">
+    <div class="hdr-l">
+      <h1>BP Tracker</h1>
+      <span id="rc">0 readings</span>
+    </div>
+    <div class="hdr-r">
+      <button class="icon-btn" onclick="printReport()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Doctor PDF
+      </button>
+      <button class="icon-btn" onclick="exportCSV()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        CSV
+      </button>
+      <div class="user-chip" onclick="goTab('profile')">
+        <div class="avatar" id="hav">?</div>
+        <span id="hname">—</span>
+      </div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab on" onclick="goTab('log')">Log Reading</button>
+    <button class="tab" onclick="goTab('history')">History</button>
+    <button class="tab" onclick="goTab('trends')">Trends</button>
+    <button class="tab" onclick="goTab('stats')">Statistics</button>
+    <button class="tab" onclick="goTab('insights')">Insights</button>
+    <button class="tab" onclick="goTab('profile')">Profile</button>
+  </div>
+
+  <!-- LOG -->
+  <div class="page on" id="tab-log">
+    <div id="anomaly-alert"></div>
+    <div class="card">
+      <div class="ctitle">New reading</div>
+      <div class="upload-zone" id="upz" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="onDrop(event)">
+        <input type="file" accept="image/*" onchange="onFile(this.files[0])">
+        <div style="font-size:22px;margin-bottom:6px">📷</div>
+        <div style="font-size:13px;color:var(--muted)">Upload a BP monitor screenshot</div>
+        <div style="font-size:11px;color:var(--hint);margin-top:3px">Tap · drag &amp; drop · paste (Ctrl+V)</div>
+      </div>
+      <div class="scan-wrap" id="scanw">
+        <div class="scan-prev">
+          <img class="scan-thumb" id="sthumb" src="" alt="">
+          <div class="scan-info">
+            <div class="scan-status" id="sstat"><span class="spinner"></span> Scanning…</div>
+            <div class="scan-sub" id="ssub2">Reading values from your screenshot</div>
+            <button class="scan-reset" onclick="resetScan()">× Use different image</button>
+          </div>
+        </div>
+      </div>
+      <div class="divider"><span>or enter manually</span></div>
+      <div class="row3">
+        <div class="fg" style="margin-bottom:0"><label>Systolic</label><input class="big-input" type="number" id="sys" placeholder="120" min="60" max="260" oninput="updPrev()"><span class="unit">mmHg</span></div>
+        <div class="fg" style="margin-bottom:0"><label>Diastolic</label><input class="big-input" type="number" id="dia" placeholder="80" min="40" max="160" oninput="updPrev()"><span class="unit">mmHg</span></div>
+        <div class="fg" style="margin-bottom:0"><label>Heart Rate</label><input class="big-input" type="number" id="hr" placeholder="—" min="30" max="220" oninput="updPrev()"><span class="unit">bpm</span></div>
+      </div>
+      <div class="row2" style="margin-top:12px">
+        <div class="fg" style="margin-bottom:0"><label>Date &amp; time</label><input type="datetime-local" id="rtime"></div>
+        <div class="fg" style="margin-bottom:0"><label>Optional note</label><input type="text" id="rnote" placeholder="Anything else…" style="font-size:14px;text-align:left;font-family:var(--ui)"></div>
+      </div>
+      <div style="margin-top:14px">
+        <span class="pill-lbl">Context tags</span>
+        <div class="pills" id="tag-pills">
+          <span class="tag-pill" onclick="this.classList.toggle('on')">After meds</span>
+          <span class="tag-pill" onclick="this.classList.toggle('on')">Post exercise</span>
+          <span class="tag-pill" onclick="this.classList.toggle('on')">Stressed</span>
+          <span class="tag-pill" onclick="this.classList.toggle('on')">Had caffeine</span>
+          <span class="tag-pill" onclick="this.classList.toggle('on')">Seated</span>
+          <span class="tag-pill" onclick="this.classList.toggle('on')">Lying down</span>
+          <span class="tag-pill" onclick="this.classList.toggle('on')">After meal</span>
+          <span class="tag-pill" onclick="this.classList.toggle('on')">Morning surge</span>
+        </div>
+      </div>
+      <div class="bp-prev" id="bpprev">
+        <div class="bp-prev-row">
+          <span class="bp-main" id="prev-val" style="color:var(--hint)">— / —</span>
+          <span class="badge" id="prev-badge" style="display:none"></span>
+        </div>
+        <div class="metrics-row" id="prev-metrics" style="display:none">
+          <div class="metric-box"><div class="metric-lbl">Pulse Pressure</div><div class="metric-val" id="prev-pp">—</div></div>
+          <div class="metric-box"><div class="metric-lbl">Mean Arterial Pressure</div><div class="metric-val" id="prev-map">—</div></div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveReading()" style="margin-top:14px">Save Reading</button>
+    </div>
+    <div class="card" id="recent-card" style="display:none">
+      <div class="ctitle">Last 3 readings</div>
+      <table class="htable" id="recent-tbl"></table>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="page" id="tab-history">
+    <div class="card">
+      <div class="sh">
+        <span class="st">All readings</span>
+        <div class="ptoggle">
+          <button class="pbtn on" onclick="fHist('all',this)">All</button>
+          <button class="pbtn" onclick="fHist(7,this)">7d</button>
+          <button class="pbtn" onclick="fHist(30,this)">30d</button>
+        </div>
+      </div>
+      <div id="hist-content"></div>
+    </div>
+  </div>
+
+  <!-- TRENDS -->
+  <div class="page" id="tab-trends">
+    <div class="card">
+      <div class="sh">
+        <span class="st">BP over time</span>
+        <div class="ptoggle">
+          <button class="pbtn on" onclick="setTP(14,this)">14d</button>
+          <button class="pbtn" onclick="setTP(30,this)">30d</button>
+          <button class="pbtn" onclick="setTP(90,this)">90d</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="li"><span class="ld" style="background:#c0392b"></span>Systolic</span>
+        <span class="li"><span class="ld" style="background:#2980b9"></span>Diastolic</span>
+        <span class="li"><span class="ld" style="background:#8e44ad"></span>Heart Rate</span>
+        <span class="li"><span class="ld" style="background:#e67e22;opacity:0.7"></span>7-day MA</span>
+      </div>
+      <div class="chart-wrap"><canvas id="trendChart" role="img" aria-label="Blood pressure trend">BP trend.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">Average by time of day</div>
+      <div class="chart-sm"><canvas id="todChart" role="img" aria-label="BP by time of day">Time of day.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">Morning vs Evening comparison</div>
+      <div class="avgs2" id="morn-eve"></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="page" id="tab-stats">
+    <div class="stats4" id="stats4"></div>
+    <div class="stats6" id="stats6"></div>
+    <div class="card">
+      <div class="ctitle">7-day average</div>
+      <div class="avgs2" id="avgs7"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">30-day average</div>
+      <div class="avgs2" id="avgs30"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">Category distribution</div>
+      <div class="chart-sm"><canvas id="catChart" role="img" aria-label="Category distribution">Distribution.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">Tag analysis</div>
+      <div id="tag-analysis"></div>
+    </div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div class="page" id="tab-insights">
+    <div id="insights-content"></div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="page" id="tab-profile">
+    <div id="prof-content"></div>
+    <button class="btn-outline btn-full" onclick="editProfile()">Edit health profile</button>
+    <button class="btn-outline btn-full btn-danger" onclick="doLogout()">Sign out</button>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   DATA LAYER — swap with API calls when backend ready
+   ════════════════════════════════════════════════════ */
+const DB={
+  users(){try{return JSON.parse(localStorage.getItem('bp_u')||'[]');}catch{return[];}},
+  saveUsers(u){localStorage.setItem('bp_u',JSON.stringify(u));},
+  readings(uid){try{return JSON.parse(localStorage.getItem('bp_r_'+uid)||'[]');}catch{return[];}},
+  saveReadings(uid,d){localStorage.setItem('bp_r_'+uid,JSON.stringify(d));},
+  profile(uid){try{return JSON.parse(localStorage.getItem('bp_p_'+uid)||'null');}catch{return null;}},
+  saveProfile(uid,p){localStorage.setItem('bp_p_'+uid,JSON.stringify(p));},
+  session(){return localStorage.getItem('bp_s');},
+  setSession(uid){localStorage.setItem('bp_s',uid);},
+  clearSession(){localStorage.removeItem('bp_s');}
+};
+/* ════════════════════════════════════════════════════ */
+
+let UID=null;
+
+/* ── UTILS ── */
+function hsh(s){let h=0;for(const c of s){h=(h<<5)-h+c.charCodeAt(0);h|=0;}return h.toString(36);}
+function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:null;}
+function fmtDT(iso){const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+function pp(s,d){return s-d;}
+function map(s,d){return Math.round(d+(s-d)/3);}
+function classify(s,d){
+  if(!s||!d)return null;
+  if(s>180||d>120)return{l:'Crisis',c:'b-cr'};
+  if(s>=140||d>=90)return{l:'High Stage 2',c:'b-s2'};
+  if(s>=130||d>=80)return{l:'High Stage 1',c:'b-s1'};
+  if(s>=120&&d<80)return{l:'Elevated',c:'b-el'};
+  return{l:'Normal',c:'b-ok'};
+}
+function setNow(){const n=new Date();document.getElementById('rtime').value=new Date(n-n.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+id).classList.add('active');}
+
+/* ── AUTH ── */
+function showReg(){document.getElementById('login-form').style.display='none';document.getElementById('reg-form').style.display='block';}
+function showLogin(){document.getElementById('reg-form').style.display='none';document.getElementById('login-form').style.display='block';}
+function doLogin(){
+  const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value;
+  const user=DB.users().find(x=>x.u.toLowerCase()===u.toLowerCase()&&x.p===hsh(p));
+  if(!user){document.getElementById('lerr').style.display='block';return;}
+  document.getElementById('lerr').style.display='none';
+  UID=user.id;DB.setSession(UID);afterLogin();
+}
+function doRegister(){
+  const u=document.getElementById('ru').value.trim(),p=document.getElementById('rp').value,p2=document.getElementById('rp2').value;
+  const e=document.getElementById('rerr');
+  if(!u){e.textContent='Please enter a username.';e.style.display='block';return;}
+  if(p.length<6){e.textContent='Password must be at least 6 characters.';e.style.display='block';return;}
+  if(p!==p2){e.textContent='Passwords do not match.';e.style.display='block';return;}
+  if(DB.users().find(x=>x.u.toLowerCase()===u.toLowerCase())){e.textContent='Username taken.';e.style.display='block';return;}
+  const uid='u'+Date.now(),users=DB.users();
+  users.push({id:uid,u,p:hsh(p)});DB.saveUsers(users);
+  UID=uid;DB.setSession(UID);e.style.display='none';afterLogin();
+}
+function afterLogin(){DB.profile(UID)?openApp():startWizard();}
+function doLogout(){UID=null;DB.clearSession();showScreen('login');document.getElementById('lu').value='';document.getElementById('lp').value='';}
+
+/* ── WIZARD ── */
+const WSTEPS=[{t:'Tell us about yourself',s:'Basic personal information'},{t:'Lifestyle habits',s:'Diet, exercise and daily routines'},{t:'Health history',s:'Medical background and risk factors'}];
+let WS=0;
+function startWizard(){WS=0;renderWS();showScreen('wizard');}
+function renderWS(){
+  document.querySelectorAll('.wstep').forEach((s,i)=>s.classList.toggle('active',i===WS));
+  document.getElementById('wtitle').textContent=WSTEPS[WS].t;
+  document.getElementById('wsub').textContent=WSTEPS[WS].s;
+  document.getElementById('wback').style.display=WS>0?'':'none';
+  document.getElementById('wnext').textContent=WS===2?'Finish setup':'Continue →';
+  document.getElementById('werr').textContent='';
+  document.getElementById('wdots').innerHTML=WSTEPS.map((_,i)=>`<span class="dot${i===WS?' on':i<WS?' done':''}"></span>`).join('');
+}
+function wBack(){if(WS>0){WS--;renderWS();}}
+function wNext(){
+  if(WS===0){if(!document.getElementById('wname').value.trim()){document.getElementById('werr').textContent='Please enter your name.';return;}if(!document.getElementById('wage').value){document.getElementById('werr').textContent='Please enter your age.';return;}}
+  if(WS<2){WS++;renderWS();return;}
+  DB.saveProfile(UID,{
+    name:document.getElementById('wname').value.trim(),age:document.getElementById('wage').value,
+    sex:document.getElementById('wsex').value,weight:document.getElementById('wweight').value,
+    height:document.getElementById('wheight').value,bloodType:sp('pblood'),diet:sp('pdiet'),
+    exercise:sp('pex'),salt:sp('psalt'),sleep:sp('psleep'),stress:sp('pstress'),
+    smoking:sp('psmoke'),smokingFreq:sp('psfreq'),drinking:sp('pdrink'),drinkingFreq:sp('pdfreq'),
+    conditions:[...document.querySelectorAll('#pcond .cpill.on')].map(x=>x.textContent.trim()),
+    bpMed:sp('pbpmed'),family:sp('pfamily'),at:new Date().toISOString()
+  });
+  openApp();
+}
+function sp(id){const s=document.querySelector('#'+id+' .pill.on');return s?s.textContent:null;}
+function tp(el,gid,single){if(single)document.querySelectorAll('#'+gid+' .pill').forEach(p=>p.classList.remove('on'));el.classList.toggle('on');}
+function tcp(el){el.classList.toggle('on');}
+function showSub(id,show){document.getElementById(id).classList.toggle('show',show);}
+
+/* ── OPEN APP ── */
+function openApp(){
+  const p=DB.profile(UID);
+  if(p){
+    const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    document.getElementById('hav').textContent=ini;
+    document.getElementById('hname').textContent=p.name.split(' ')[0];
+  }
+  showScreen('app');setNow();refreshAll();
+  runPatternAgent();
+}
+
+/* ── TABS ── */
+function goTab(name){
+  const names=['log','history','trends','stats','insights','profile'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',names[i]===name));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+  if(name==='trends')renderTrends();
+  if(name==='stats')renderStats();
+  if(name==='history')renderHistory();
+  if(name==='insights')renderInsights();
+  if(name==='profile')renderProfile();
+}
+
+/* ── IMAGE SCAN ── */
+function onDrop(e){e.preventDefault();this.classList.remove('drag');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))onFile(f);}
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])];const im=it.find(i=>i.type.startsWith('image/'));if(im)onFile(im.getAsFile());});
+function onFile(f){if(!f)return;const r=new FileReader();r.onload=e=>startScan(e.target.result);r.readAsDataURL(f);}
+function startScan(url){
+  document.getElementById('upz').style.display='none';
+  const sw=document.getElementById('scanw');sw.classList.add('show');
+  document.getElementById('sthumb').src=url;
+  document.getElementById('sstat').innerHTML='<span class="spinner"></span> Scanning…';
+  document.getElementById('ssub2').textContent='Reading values from your screenshot';
+  extractBP(url);
+}
+async function extractBP(dataUrl){
+  const b64=dataUrl.split(',')[1],mime=(dataUrl.match(/^data:(image\/\w+);/)||[])[1]||'image/jpeg';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:'Extract blood pressure from this image. Return ONLY JSON: {"sys":int,"dia":int,"hr":int_or_null}'}]}]})});
+    const data=await res.json();
+    const txt=data.content?.find(b=>b.type==='text')?.text||'';
+    const parsed=JSON.parse(txt.trim());
+    if(!parsed.sys||!parsed.dia)throw new Error('Values not found');
+    document.getElementById('sstat').innerHTML='✓ Values extracted';
+    document.getElementById('ssub2').textContent=`${parsed.sys}/${parsed.dia}${parsed.hr?' · HR '+parsed.hr:''} — confirm time below`;
+    document.getElementById('sys').value=parsed.sys;document.getElementById('dia').value=parsed.dia;document.getElementById('hr').value=parsed.hr||'';
+    updPrev();document.getElementById('rtime').focus();
+  }catch(e){
+    document.getElementById('sstat').innerHTML='⚠ Could not read values';
+    document.getElementById('ssub2').textContent='Enter values manually below';
+  }
+}
+function resetScan(){
+  document.getElementById('upz').style.display='';document.getElementById('scanw').classList.remove('show');
+  document.getElementById('sys').value='';document.getElementById('dia').value='';document.getElementById('hr').value='';
+  document.getElementById('prev-val').textContent='— / —';document.getElementById('prev-badge').style.display='none';
+  document.getElementById('prev-metrics').style.display='none';
+}
+
+/* ── LOG PREVIEW ── */
+function updPrev(){
+  const s=parseInt(document.getElementById('sys').value),d=parseInt(document.getElementById('dia').value);
+  const pv=document.getElementById('prev-val'),pb=document.getElementById('prev-badge'),pm=document.getElementById('prev-metrics');
+  if(s&&d){
+    pv.textContent=s+' / '+d;pv.style.color='var(--text)';
+    const cat=classify(s,d);
+    if(cat){pb.textContent=cat.l;pb.className='badge '+cat.c;pb.style.display='inline-block';}
+    document.getElementById('prev-pp').textContent=pp(s,d)+' mmHg';
+    document.getElementById('prev-map').textContent=map(s,d)+' mmHg';
+    pm.style.display='grid';
+  } else {pv.textContent='— / —';pv.style.color='var(--hint)';pb.style.display='none';pm.style.display='none';}
+}
+
+/* ── SAVE ── */
+function saveReading(){
+  const s=parseInt(document.getElementById('sys').value),d=parseInt(document.getElementById('dia').value),h=parseInt(document.getElementById('hr').value);
+  const t=document.getElementById('rtime').value,note=document.getElementById('rnote').value.trim();
+  const tags=[...document.querySelectorAll('#tag-pills .tag-pill.on')].map(x=>x.textContent.trim());
+  if(!s||!d){alert('Please enter systolic and diastolic values.');return;}
+  const reading={id:Date.now(),sys:s,dia:d,hr:h||null,time:t?new Date(t).toISOString():new Date().toISOString(),note,tags,pp:pp(s,d),map:map(s,d)};
+  const all=DB.readings(UID);all.unshift(reading);DB.saveReadings(UID,all);
+  document.getElementById('rnote').value='';
+  document.querySelectorAll('#tag-pills .tag-pill').forEach(p=>p.classList.remove('on'));
+  resetScan();setNow();refreshAll();
+  checkAnomaly(reading);
+  runPatternAgent();
+}
+function delReading(id){if(!confirm('Delete this reading?'))return;DB.saveReadings(UID,DB.readings(UID).filter(r=>r.id!==id));refreshAll();}
+
+/* ── ANOMALY DETECTOR ── */
+function checkAnomaly(r){
+  const el=document.getElementById('anomaly-alert');
+  if(r.sys>180||r.dia>120){
+    let secs=300;
+    const tick=()=>{const m=Math.floor(secs/60),s=secs%60;el.innerHTML=`<div class="alert alert-danger"><button class="dismiss" onclick="document.getElementById('anomaly-alert').innerHTML=''">×</button><div class="alert-title">⚠ Crisis-level reading detected (${r.sys}/${r.dia})</div><div class="alert-body">Please rest quietly for 5 minutes and re-test. Re-test reminder in <strong>${m}:${String(s).padStart(2,'0')}</strong>. If reading remains high, seek medical attention immediately.</div></div>`;secs--;if(secs>=0)setTimeout(tick,1000);else el.innerHTML=`<div class="alert alert-danger"><button class="dismiss" onclick="this.parentElement.remove()">×</button><div class="alert-title">Re-test now</div><div class="alert-body">5 minutes have passed. Please take another reading.</div></div>`;};
+    tick();
+  } else if(r.sys>=140||r.dia>=90){
+    el.innerHTML=`<div class="alert alert-warn"><button class="dismiss" onclick="this.parentElement.remove()">×</button><div class="alert-title">High reading noted</div><div class="alert-body">Systolic ${r.sys} / Diastolic ${r.dia}. Consider resting and retaking if you feel this may be influenced by activity or stress.</div></div>`;
+  } else {el.innerHTML='';}
+}
+
+/* ── PATTERN AGENT ── */
+function runPatternAgent(){
+  const all=DB.readings(UID);if(all.length<7)return;
+  const now=Date.now();
+  const w1=all.filter(r=>now-new Date(r.time)<7*864e5);
+  const w2=all.filter(r=>{const t=now-new Date(r.time);return t>=7*864e5&&t<14*864e5;});
+  if(!w1.length||!w2.length)return;
+  const avgS1=avg(w1.map(r=>r.sys)),avgS2=avg(w2.map(r=>r.sys));
+  const diff=avgS1-avgS2;
+  const alerts=JSON.parse(localStorage.getItem('bp_agent_'+UID)||'[]');
+  if(Math.abs(diff)>=5){
+    const msg=diff>0?`Your average systolic this week (${Math.round(avgS1)} mmHg) is ${Math.round(diff)} mmHg higher than last week (${Math.round(avgS2)} mmHg).`:`Your average systolic this week (${Math.round(avgS1)} mmHg) is ${Math.round(Math.abs(diff))} mmHg lower than last week (${Math.round(avgS2)} mmHg) — good progress.`;
+    const existing=alerts.find(a=>a.type==='trend_weekly');
+    if(!existing||Math.abs(existing.diff-diff)>1){
+      alerts.unshift({type:'trend_weekly',diff,msg,time:new Date().toISOString()});
+      localStorage.setItem('bp_agent_'+UID,JSON.stringify(alerts.slice(0,20)));
+    }
+  }
+}
+function getAgentAlerts(){return JSON.parse(localStorage.getItem('bp_agent_'+UID)||'[]');}
+
+/* ── RENDER HISTORY ── */
+let hf='all';
+function fHist(v,btn){hf=v;document.querySelectorAll('#tab-history .pbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderHistory();}
+function renderHistory(){
+  let data=DB.readings(UID);
+  if(hf!=='all'){const c=Date.now()-hf*864e5;data=data.filter(r=>new Date(r.time)>c);}
+  const el=document.getElementById('hist-content');
+  if(!data.length){el.innerHTML='<div class="empty">No readings yet.</div>';return;}
+  el.innerHTML=`<table class="htable"><thead><tr><th>Date/Time</th><th>BP</th><th>HR</th><th>PP</th><th>MAP</th><th>Category</th><th>Tags</th><th></th></tr></thead><tbody>${data.map(r=>{
+    const cat=classify(r.sys,r.dia);
+    const pval=(r.pp!==undefined?r.pp:pp(r.sys,r.dia));
+    const mval=(r.map!==undefined?r.map:map(r.sys,r.dia));
+    const tgs=(r.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('');
+    return`<tr><td style="color:var(--muted);font-size:12px">${fmtDT(r.time)}</td><td><span class="bp-val">${r.sys}/${r.dia}</span></td><td style="color:var(--muted)">${r.hr?r.hr+' bpm':'—'}</td><td style="color:var(--muted)">${pval}</td><td style="color:var(--muted)">${mval}</td><td>${cat?`<span class="badge ${cat.c}">${cat.l}</span>`:''}</td><td>${tgs||'<span style="color:var(--hint);font-size:11px">—</span>'}</td><td><button class="del-btn" onclick="delReading(${r.id})">×</button></td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+function renderRecent(){
+  const data=DB.readings(UID).slice(0,3);
+  const c=document.getElementById('recent-card');
+  if(!data.length){c.style.display='none';return;}c.style.display='block';
+  document.getElementById('recent-tbl').innerHTML=`<thead><tr><th>Date/Time</th><th>BP</th><th>PP</th><th>MAP</th><th>Category</th></tr></thead><tbody>${data.map(r=>{const cat=classify(r.sys,r.dia);const pval=(r.pp!==undefined?r.pp:pp(r.sys,r.dia));const mval=(r.map!==undefined?r.map:map(r.sys,r.dia));return`<tr><td style="color:var(--muted);font-size:12px">${fmtDT(r.time)}</td><td><span class="bp-val">${r.sys}/${r.dia}</span></td><td style="color:var(--muted)">${pval}</td><td style="color:var(--muted)">${mval}</td><td>${cat?`<span class="badge ${cat.c}">${cat.l}</span>`:''}</td></tr>`;}).join('')}</tbody>`;
+}
+
+/* ── RENDER STATS ── */
+function renderStats(){
+  const all=DB.readings(UID),n=all.length;
+  document.getElementById('rc').textContent=n+' reading'+(n!==1?'s':'');
+  if(!n){['stats4','stats6','avgs7','avgs30','tag-analysis'].forEach(id=>document.getElementById(id).innerHTML='<div class="empty">No readings yet.</div>');return;}
+  const avgS=avg(all.map(r=>r.sys)),avgD=avg(all.map(r=>r.dia)),avgH=avg(all.filter(r=>r.hr).map(r=>r.hr));
+  const avgPP=avg(all.map(r=>r.pp!==undefined?r.pp:pp(r.sys,r.dia)));
+  const avgMAP=avg(all.map(r=>r.map!==undefined?r.map:map(r.sys,r.dia)));
+  const maxR=all.reduce((a,b)=>b.sys>a.sys?b:a);
+  const minR=all.reduce((a,b)=>b.sys<a.sys?b:a);
+  document.getElementById('stats4').innerHTML=`
+    <div class="stat-card"><div class="s-lbl">Avg Systolic</div><div class="s-val">${Math.round(avgS)}</div><div class="s-sub">mmHg</div></div>
+    <div class="stat-card"><div class="s-lbl">Avg Diastolic</div><div class="s-val">${Math.round(avgD)}</div><div class="s-sub">mmHg</div></div>
+    <div class="stat-card"><div class="s-lbl">Avg Heart Rate</div><div class="s-val">${avgH?Math.round(avgH):'—'}</div><div class="s-sub">bpm</div></div>
+    <div class="stat-card"><div class="s-lbl">Total Readings</div><div class="s-val">${n}</div><div class="s-sub">all time</div></div>`;
+  document.getElementById('stats6').innerHTML=`
+    <div class="stat-card"><div class="s-lbl">Avg Pulse Pressure</div><div class="s-val">${Math.round(avgPP)}</div><div class="s-sub">mmHg${avgPP>60?' · elevated':''}</div></div>
+    <div class="stat-card"><div class="s-lbl">Avg MAP</div><div class="s-val">${Math.round(avgMAP)}</div><div class="s-sub">mmHg${avgMAP>100?' · high':''}</div></div>
+    <div class="stat-card"><div class="s-lbl">Highest Reading</div><div class="s-val danger">${maxR.sys}/${maxR.dia}</div><div class="s-sub">${fmtDT(maxR.time)}</div></div>
+    <div class="stat-card"><div class="s-lbl">Lowest Reading</div><div class="s-val ok">${minR.sys}/${minR.dia}</div><div class="s-sub">${fmtDT(minR.time)}</div></div>
+    <div class="stat-card"><div class="s-lbl">Normal Readings</div><div class="s-val ok">${all.filter(r=>{const c=classify(r.sys,r.dia);return c&&c.l==='Normal';}).length}</div><div class="s-sub">${Math.round(all.filter(r=>{const c=classify(r.sys,r.dia);return c&&c.l==='Normal';}).length/n*100)}%</div></div>
+    <div class="stat-card"><div class="s-lbl">High Readings</div><div class="s-val danger">${all.filter(r=>{const c=classify(r.sys,r.dia);return c&&(c.l==='High Stage 1'||c.l==='High Stage 2'||c.l==='Crisis');}).length}</div><div class="s-sub">${Math.round(all.filter(r=>{const c=classify(r.sys,r.dia);return c&&(c.l==='High Stage 1'||c.l==='High Stage 2'||c.l==='Crisis');}).length/n*100)}%</div></div>`;
+  // Period averages
+  function avgCard(lbl,data){
+    if(!data.length)return`<div class="avg-card"><div class="a-lbl">${lbl}</div><div style="color:var(--hint);font-size:13px">No data</div></div>`;
+    const s=avg(data.map(r=>r.sys)),d=avg(data.map(r=>r.dia)),h=avg(data.filter(r=>r.hr).map(r=>r.hr));
+    const cat=classify(Math.round(s),Math.round(d));
+    return`<div class="avg-card"><div class="a-lbl">${lbl}</div><div class="a-val">${Math.round(s)}/${Math.round(d)}</div><div class="a-sub">${h?Math.round(h)+' bpm · ':''}${cat?cat.l:''}</div></div>`;
+  }
+  const now=Date.now();
+  const w7=all.filter(r=>now-new Date(r.time)<7*864e5);
+  const w30=all.filter(r=>now-new Date(r.time)<30*864e5);
+  document.getElementById('avgs7').innerHTML=avgCard('Systolic / Diastolic',w7)+avgCard('Heart Rate',w7);
+  document.getElementById('avgs30').innerHTML=avgCard('Systolic / Diastolic',w30)+avgCard('Heart Rate',w30);
+  // Category chart
+  if(window._cc)window._cc.destroy();
+  const cats=['Normal','Elevated','High Stage 1','High Stage 2','Crisis'];
+  const catCols=['#16a34a','#ca8a04','#ea580c','#dc2626','#7f1d1d'];
+  window._cc=new Chart(document.getElementById('catChart'),{type:'doughnut',data:{labels:cats,datasets:[{data:cats.map(c=>all.filter(r=>{const k=classify(r.sys,r.dia);return k&&k.l===c;}).length),backgroundColor:catCols,borderWidth:1,borderColor:'rgba(255,255,255,0.3)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}}}});
+  // Tag analysis
+  const allTags=['After meds','Post exercise','Stressed','Had caffeine','Seated','Lying down','After meal','Morning surge'];
+  const tagRows=allTags.map(tag=>{
+    const tagged=all.filter(r=>(r.tags||[]).includes(tag));
+    if(!tagged.length)return null;
+    const ts=avg(tagged.map(r=>r.sys)),td=avg(tagged.map(r=>r.dia));
+    const diff=ts-avgS;
+    return`<tr><td style="font-size:13px">${tag}</td><td style="font-size:13px;font-family:var(--font)">${Math.round(ts)}/${Math.round(td)}</td><td style="font-size:13px">${tagged.length}</td><td><span style="font-size:12px;color:${diff>3?'var(--s2)':diff<-3?'var(--ok)':'var(--muted)'}">${diff>0?'+':''}${Math.round(diff)} mmHg</span></td></tr>`;
+  }).filter(Boolean);
+  document.getElementById('tag-analysis').innerHTML=tagRows.length?`<table class="htable"><thead><tr><th>Tag</th><th>Avg BP</th><th>Readings</th><th>vs overall avg</th></tr></thead><tbody>${tagRows.join('')}</tbody></table>`:'<div class="empty" style="padding:20px">No tagged readings yet. Add context tags when logging.</div>';
+}
+
+/* ── RENDER TRENDS ── */
+let tP=14;
+function setTP(d,btn){tP=d;document.querySelectorAll('#tab-trends .pbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTrends();}
+function movAvg(data,days){
+  return data.map(r=>{
+    const t=new Date(r.time).getTime();
+    const win=data.filter(x=>{const xt=new Date(x.time).getTime();return xt<=t&&xt>t-days*864e5;});
+    return Math.round(avg(win.map(w=>w.sys)));
+  });
+}
+function renderTrends(){
+  const all=DB.readings(UID);
+  const data=all.filter(r=>new Date(r.time)>Date.now()-tP*864e5).reverse();
+  if(window._tc)window._tc.destroy();if(window._tod)window._tod.destroy();
+  if(!data.length)return;
+  const ma7=movAvg(data,7);
+  window._tc=new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:data.map(r=>fmtDT(r.time)),datasets:[
+    {label:'Systolic',data:data.map(r=>r.sys),borderColor:'#c0392b',backgroundColor:'rgba(192,57,43,0.06)',tension:0.3,pointRadius:3,borderWidth:1.5},
+    {label:'Diastolic',data:data.map(r=>r.dia),borderColor:'#2980b9',backgroundColor:'rgba(41,128,185,0.06)',tension:0.3,pointRadius:3,borderWidth:1.5},
+    {label:'Heart Rate',data:data.map(r=>r.hr||null),borderColor:'#8e44ad',backgroundColor:'transparent',tension:0.3,pointRadius:3,borderWidth:1.5,borderDash:[4,3],yAxisID:'y2'},
+    {label:'7-day MA (sys)',data:ma7,borderColor:'#e67e22',backgroundColor:'transparent',tension:0.4,pointRadius:0,borderWidth:2.5,borderDash:[6,2]}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+    x:{ticks:{font:{size:10},maxTicksLimit:8,maxRotation:30},grid:{display:false}},
+    y:{min:50,ticks:{font:{size:10}},grid:{color:'rgba(128,128,128,0.08)'}},
+    y2:{position:'right',min:40,max:130,ticks:{font:{size:10}},grid:{display:false}}
+  }}});
+  // Time of day chart
+  const slots=[[],[],[],[]];
+  data.forEach(r=>{const h=new Date(r.time).getHours();if(h>=6&&h<12)slots[0].push(r);else if(h>=12&&h<18)slots[1].push(r);else if(h>=18&&h<22)slots[2].push(r);else slots[3].push(r);});
+  window._tod=new Chart(document.getElementById('todChart'),{type:'bar',data:{labels:['Morning','Afternoon','Evening','Night'],datasets:[
+    {label:'Avg Systolic',data:slots.map(s=>{const a=avg(s.map(r=>r.sys));return a?Math.round(a):null;}),backgroundColor:'rgba(192,57,43,0.7)'},
+    {label:'Avg Diastolic',data:slots.map(s=>{const a=avg(s.map(r=>r.dia));return a?Math.round(a):null;}),backgroundColor:'rgba(41,128,185,0.7)'}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false}},y:{min:50,ticks:{font:{size:10}}}}}});
+  // Morning vs Evening
+  const morn=data.filter(r=>{const h=new Date(r.time).getHours();return h>=5&&h<12;});
+  const eve=data.filter(r=>{const h=new Date(r.time).getHours();return h>=17&&h<23;});
+  function meCard(lbl,d,icon){
+    if(!d.length)return`<div class="avg-card"><div class="a-lbl">${icon} ${lbl}</div><div style="color:var(--hint);font-size:13px">No data</div></div>`;
+    const s=avg(d.map(r=>r.sys)),di=avg(d.map(r=>r.dia));
+    const cat=classify(Math.round(s),Math.round(di));
+    return`<div class="avg-card"><div class="a-lbl">${icon} ${lbl}</div><div class="a-val">${Math.round(s)}/${Math.round(di)}</div><div class="a-sub">${cat?cat.l:''}</div></div>`;
+  }
+  document.getElementById('morn-eve').innerHTML=meCard('Morning (5am–12pm)',morn,'🌅')+meCard('Evening (5pm–11pm)',eve,'🌙');
+}
+
+/* ── RENDER INSIGHTS ── */
+function renderInsights(){
+  const all=DB.readings(UID);
+  const el=document.getElementById('insights-content');
+  if(all.length<5){el.innerHTML='<div class="empty">Log at least 5 readings to see insights.</div>';return;}
+  const now=Date.now();
+  const w1=all.filter(r=>now-new Date(r.time)<7*864e5);
+  const w2=all.filter(r=>{const t=now-new Date(r.time);return t>=7*864e5&&t<14*864e5;});
+  let html='';
+  // Weekly trend
+  if(w1.length&&w2.length){
+    const s1=avg(w1.map(r=>r.sys)),s2=avg(w2.map(r=>r.sys));
+    const d1=avg(w1.map(r=>r.dia)),d2=avg(w2.map(r=>r.dia));
+    const sdiff=s1-s2,ddiff=d1-d2;
+    const dir=sdiff>5?'up':sdiff<-5?'down':'neutral';
+    html+=`<div class="card"><div class="ctitle">📊 Weekly trend</div>
+      <div class="insights-grid">
+        <div class="insight-card ${dir}"><div class="i-lbl">This week avg systolic</div><div class="i-val">${Math.round(s1)}</div><div class="i-sub">vs ${Math.round(s2)} last week (${sdiff>0?'+':''}${Math.round(sdiff)} mmHg)</div></div>
+        <div class="insight-card ${ddiff>5?'up':ddiff<-5?'down':'neutral'}"><div class="i-lbl">This week avg diastolic</div><div class="i-val">${Math.round(d1)}</div><div class="i-sub">vs ${Math.round(d2)} last week (${ddiff>0?'+':''}${Math.round(ddiff)} mmHg)</div></div>
+      </div>
+      ${Math.abs(sdiff)>=5?`<div class="alert ${sdiff>0?'alert-warn':'alert-ok'}" style="margin-bottom:0"><div class="alert-title">${sdiff>0?'⚠ Upward trend detected':'✓ Downward trend — good progress'}</div><div class="alert-body">${sdiff>0?'Your average systolic has risen by '+Math.round(sdiff)+' mmHg compared to last week. Monitor closely and consider discussing with your doctor if this continues.':'Your average systolic has dropped by '+Math.round(Math.abs(sdiff))+' mmHg compared to last week.'}</div></div>`:''}
+    </div>`;
+  }
+  // Morning surge detection
+  const mornR=all.filter(r=>{const h=new Date(r.time).getHours();return h>=5&&h<=9;});
+  const midR=all.filter(r=>{const h=new Date(r.time).getHours();return h>=10&&h<=14;});
+  if(mornR.length>=3&&midR.length>=3){
+    const ms=avg(mornR.map(r=>r.sys)),ms2=avg(midR.map(r=>r.sys));
+    const surge=ms-ms2;
+    html+=`<div class="card"><div class="ctitle">🌅 Morning surge analysis</div>
+      <div class="insights-grid">
+        <div class="insight-card ${surge>20?'up':'neutral'}"><div class="i-lbl">Morning avg (5–9am)</div><div class="i-val">${Math.round(ms)}</div><div class="i-sub">systolic mmHg</div></div>
+        <div class="insight-card neutral"><div class="i-lbl">Late morning avg (10am–2pm)</div><div class="i-val">${Math.round(ms2)}</div><div class="i-sub">systolic mmHg</div></div>
+      </div>
+      ${surge>20?`<div class="alert alert-warn" style="margin-bottom:0"><div class="alert-title">⚠ Significant morning surge (+${Math.round(surge)} mmHg)</div><div class="alert-body">Your morning BP is notably higher than mid-morning. Morning surges can increase cardiovascular risk. Discuss with your doctor, especially regarding medication timing.</div></div>`:surge>10?`<div class="alert alert-info" style="margin-bottom:0"><div class="alert-title">Morning surge noted (+${Math.round(surge)} mmHg)</div><div class="alert-body">Mild morning elevation is normal. Continue monitoring.</div></div>`:'<p style="font-size:13px;color:var(--muted)">No significant morning surge detected.</p>'}
+    </div>`;
+  }
+  // Tag correlations
+  const allTags=['After meds','Post exercise','Stressed','Had caffeine','After meal'];
+  const baseS=avg(all.map(r=>r.sys));
+  const tagInsights=allTags.map(tag=>{
+    const tagged=all.filter(r=>(r.tags||[]).includes(tag));
+    if(tagged.length<2)return null;
+    const ts=avg(tagged.map(r=>r.sys));
+    const diff=ts-baseS;
+    if(Math.abs(diff)<3)return null;
+    return{tag,diff,count:tagged.length,avg:Math.round(ts)};
+  }).filter(Boolean);
+  if(tagInsights.length){
+    html+=`<div class="card"><div class="ctitle">🔗 Context correlations</div>
+      ${tagInsights.map(t=>`<div class="alert ${t.diff>5?'alert-warn':t.diff<-3?'alert-ok':'alert-info'}" style="margin-bottom:8px">
+        <div class="alert-title">${t.tag}: avg ${t.avg} mmHg systolic (${t.diff>0?'+':''}${Math.round(t.diff)} vs baseline)</div>
+        <div class="alert-body">Based on ${t.count} reading${t.count>1?'s':''} tagged "${t.tag}". ${t.diff>5?'This context appears to correlate with higher BP.':t.diff<-3?'This context appears to correlate with lower BP.':'Mild correlation noted.'}</div>
+      </div>`).join('')}
+    </div>`;
+  }
+  // Pulse pressure insight
+  const avgPPval=avg(all.map(r=>r.pp!==undefined?r.pp:pp(r.sys,r.dia)));
+  if(avgPPval>60){
+    html+=`<div class="card"><div class="ctitle">💓 Pulse pressure alert</div>
+      <div class="alert alert-warn" style="margin-bottom:0">
+        <div class="alert-title">Elevated average pulse pressure: ${Math.round(avgPPval)} mmHg</div>
+        <div class="alert-body">A pulse pressure above 60 mmHg may indicate arterial stiffness. This is worth discussing with your doctor, particularly if you are over 50.</div>
+      </div>
+    </div>`;
+  }
+  // Agent alerts history
+  const agentAlerts=getAgentAlerts();
+  if(agentAlerts.length){
+    html+=`<div class="card"><div class="ctitle">🤖 Pattern agent log</div>${agentAlerts.slice(0,5).map(a=>`<div class="alert alert-info" style="margin-bottom:8px"><div class="alert-title">${fmtDT(a.time)}</div><div class="alert-body">${a.msg}</div></div>`).join('')}</div>`;
+  }
+  if(!html)html='<div class="empty">Not enough data yet for insights. Keep logging readings.</div>';
+  el.innerHTML=html;
+}
+
+/* ── PROFILE PAGE ── */
+function renderProfile(){
+  const p=DB.profile(UID);
+  if(!p){document.getElementById('prof-content').innerHTML='<div class="empty">No profile set up.</div>';return;}
+  const bmi=p.weight&&p.height?(p.weight/((p.height/100)**2)).toFixed(1):null;
+  const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  const risks=[
+    p.smoking&&p.smoking!=='Non-smoker'?{t:p.smoking+(p.smokingFreq?' · '+p.smokingFreq:''),c:'#dc2626',b:'#fef2f2'}:null,
+    p.drinking&&p.drinking!=='Non-drinker'?{t:p.drinking+' drinker'+(p.drinkingFreq?' ('+p.drinkingFreq+'/wk)':''),c:'#ea580c',b:'#fff7ed'}:null,
+    p.family==='Yes'?{t:'Family history of hypertension',c:'#ca8a04',b:'#fefce8'}:null,
+    p.bpMed==='Yes'?{t:'On BP medication',c:'#2980b9',b:'#eff6ff'}:null,
+    ...(p.conditions||[]).filter(c=>c!=='None').map(c=>({t:c,c:'#8e44ad',b:'#f5f3ff'}))
+  ].filter(Boolean);
+  const pi=(l,v)=>`<div class="pi"><div class="pi-l">${l}</div><div class="pi-v">${v||'—'}</div></div>`;
+  document.getElementById('prof-content').innerHTML=`
+    <div class="prof-hero"><div class="prof-av">${ini}</div><div><div class="prof-name">${p.name}</div><div class="prof-sub">${[p.age?p.age+' yrs':null,p.sex,bmi?'BMI '+bmi:null].filter(Boolean).join(' · ')}</div></div></div>
+    <div class="card"><div class="ctitle">Personal</div><div class="pgrid">${pi('Age',p.age?p.age+' years':null)}${pi('Sex',p.sex)}${pi('Weight',p.weight?p.weight+' kg':null)}${pi('Height',p.height?p.height+' cm':null)}${bmi?pi('BMI',bmi):''}${pi('Blood type',p.bloodType)}</div></div>
+    <div class="card"><div class="ctitle">Lifestyle</div><div class="pgrid">${pi('Diet',p.diet)}${pi('Exercise',p.exercise)}${pi('Salt intake',p.salt)}${pi('Sleep',p.sleep)}${pi('Stress',p.stress)}</div></div>
+    ${risks.length?`<div class="card"><div class="ctitle">Risk factors</div><div>${risks.map(r=>`<span class="risk-tag" style="background:${r.b};color:${r.c}">${r.t}</span>`).join('')}</div></div>`:''}`;
+}
+function editProfile(){WS=0;renderWS();showScreen('wizard');}
+
+/* ── EXPORT CSV ── */
+function exportCSV(){
+  const data=DB.readings(UID);if(!data.length){alert('No readings to export.');return;}
+  const rows=data.map(r=>{const cat=classify(r.sys,r.dia);const pval=r.pp!==undefined?r.pp:pp(r.sys,r.dia);const mval=r.map!==undefined?r.map:map(r.sys,r.dia);return[new Date(r.time).toLocaleString(),r.sys,r.dia,r.hr||'',pval,mval,cat?cat.l:'',(r.tags||[]).join('|'),r.note||''].join(',');});
+  const csv=['Date/Time,Systolic,Diastolic,Heart Rate,Pulse Pressure,MAP,Category,Tags,Note',...rows].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='bp-readings.csv';a.click();
+}
+
+/* ── PRINT / PDF REPORT ── */
+function printReport(){
+  const all=DB.readings(UID);const p=DB.profile(UID);
+  if(!all.length){alert('No readings to export.');return;}
+  const now=Date.now();
+  const avgS=avg(all.map(r=>r.sys)),avgD=avg(all.map(r=>r.dia));
+  const avgH=avg(all.filter(r=>r.hr).map(r=>r.hr));
+  const avgPPv=avg(all.map(r=>r.pp!==undefined?r.pp:pp(r.sys,r.dia)));
+  const avgMAPv=avg(all.map(r=>r.map!==undefined?r.map:map(r.sys,r.dia)));
+  const maxR=all.reduce((a,b)=>b.sys>a.sys?b:a);
+  const minR=all.reduce((a,b)=>b.sys<a.sys?b:a);
+  const mornR=all.filter(r=>{const h=new Date(r.time).getHours();return h>=5&&h<12;});
+  const eveR=all.filter(r=>{const h=new Date(r.time).getHours();return h>=17&&h<23;});
+  const mornAvg=mornR.length?`${Math.round(avg(mornR.map(r=>r.sys)))}/${Math.round(avg(mornR.map(r=>r.dia)))}`:'-';
+  const eveAvg=eveR.length?`${Math.round(avg(eveR.map(r=>r.sys)))}/${Math.round(avg(eveR.map(r=>r.dia)))}`:'-';
+  const cats=['Normal','Elevated','High Stage 1','High Stage 2','Crisis'];
+  const catCounts=cats.map(c=>all.filter(r=>{const k=classify(r.sys,r.dia);return k&&k.l===c;}).length);
+  const catPcts=catCounts.map(c=>Math.round(c/all.length*100));
+  // Trend data (last 30 days)
+  const trend30=all.filter(r=>new Date(r.time)>now-30*864e5).reverse();
+  const w1=all.filter(r=>now-new Date(r.time)<7*864e5);
+  const w2=all.filter(r=>{const t=now-new Date(r.time);return t>=7*864e5&&t<14*864e5;});
+  const weekDiff=w1.length&&w2.length?Math.round(avg(w1.map(r=>r.sys))-avg(w2.map(r=>r.sys))):null;
+  // Insights for report
+  let insightLines=[];
+  if(weekDiff!==null&&Math.abs(weekDiff)>=5)insightLines.push((weekDiff>0?'⚠ Upward weekly trend: +':'✓ Downward weekly trend: ')+Math.abs(weekDiff)+' mmHg systolic vs prior week.');
+  if(avgPPv>60)insightLines.push('⚠ Elevated average pulse pressure ('+Math.round(avgPPv)+' mmHg) — possible arterial stiffness.');
+  if(mornR.length&&eveR.length){const ms=avg(mornR.map(r=>r.sys))-avg(eveR.map(r=>r.sys));if(ms>15)insightLines.push('⚠ Morning BP is '+Math.round(ms)+' mmHg higher than evening — morning surge noted.');}
+  const recent10=all.slice(0,10);
+  document.getElementById('print-report').innerHTML=`
+    <div class="pr-header">
+      <div class="pr-title">Blood Pressure Report</div>
+      <div class="pr-patient">${p?p.name+' · '+[p.age?'Age '+p.age:null,p.sex,p.weight?p.weight+'kg':null].filter(Boolean).join(', ')+'<br>':''}Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · ${all.length} total readings</div>
+    </div>
+    <div class="pr-section">
+      <h3>Key Metrics</h3>
+      <div class="pr-grid">
+        <div class="pr-stat"><div class="pr-stat-lbl">Avg BP</div><div class="pr-stat-val">${Math.round(avgS)}/${Math.round(avgD)}</div></div>
+        <div class="pr-stat"><div class="pr-stat-lbl">Avg HR</div><div class="pr-stat-val">${avgH?Math.round(avgH)+'bpm':'—'}</div></div>
+        <div class="pr-stat"><div class="pr-stat-lbl">Avg PP</div><div class="pr-stat-val">${Math.round(avgPPv)} mmHg</div></div>
+        <div class="pr-stat"><div class="pr-stat-lbl">Avg MAP</div><div class="pr-stat-val">${Math.round(avgMAPv)} mmHg</div></div>
+        <div class="pr-stat"><div class="pr-stat-lbl">Highest</div><div class="pr-stat-val" style="color:#dc2626">${maxR.sys}/${maxR.dia}</div></div>
+        <div class="pr-stat"><div class="pr-stat-lbl">Lowest</div><div class="pr-stat-val" style="color:#16a34a">${minR.sys}/${minR.dia}</div></div>
+        <div class="pr-stat"><div class="pr-stat-lbl">Morning Avg</div><div class="pr-stat-val">${mornAvg}</div></div>
+        <div class="pr-stat"><div class="pr-stat-lbl">Evening Avg</div><div class="pr-stat-val">${eveAvg}</div></div>
+      </div>
+    </div>
+    <div class="pr-row2">
+      <div class="pr-section">
+        <h3>Category Distribution</h3>
+        <table class="pr-table">
+          <thead><tr><th>Category</th><th>Count</th><th>%</th></tr></thead>
+          <tbody>${cats.map((c,i)=>`<tr><td>${c}</td><td>${catCounts[i]}</td><td>${catPcts[i]}%</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div class="pr-section">
+        <h3>Health Profile</h3>
+        ${p?`<table class="pr-table"><tbody>
+          ${p.diet?`<tr><td>Diet</td><td>${p.diet}</td></tr>`:''}
+          ${p.exercise?`<tr><td>Exercise</td><td>${p.exercise}</td></tr>`:''}
+          ${p.smoking?`<tr><td>Smoking</td><td>${p.smoking}</td></tr>`:''}
+          ${p.drinking?`<tr><td>Alcohol</td><td>${p.drinking}</td></tr>`:''}
+          ${p.bpMed?`<tr><td>BP Medication</td><td>${p.bpMed}</td></tr>`:''}
+          ${p.family?`<tr><td>Family history</td><td>${p.family}</td></tr>`:''}
+          ${(p.conditions||[]).filter(c=>c!=='None').length?`<tr><td>Conditions</td><td>${(p.conditions||[]).filter(c=>c!=='None').join(', ')}</td></tr>`:''}
+        </tbody></table>`:'<p>No profile data.</p>'}
+      </div>
+    </div>
+    ${insightLines.length?`<div class="pr-section"><h3>Clinical Insights</h3><div class="pr-insights">${insightLines.map(l=>`<div style="margin-bottom:4px">${l}</div>`).join('')}</div></div>`:''}
+    <div class="pr-section">
+      <h3>Recent Readings (last 10)</h3>
+      <table class="pr-table">
+        <thead><tr><th>Date/Time</th><th>Systolic</th><th>Diastolic</th><th>HR</th><th>PP</th><th>MAP</th><th>Category</th><th>Tags</th></tr></thead>
+        <tbody>${recent10.map(r=>{const cat=classify(r.sys,r.dia);const pval=r.pp!==undefined?r.pp:pp(r.sys,r.dia);const mval=r.map!==undefined?r.map:map(r.sys,r.dia);return`<tr><td>${fmtDT(r.time)}</td><td>${r.sys}</td><td>${r.dia}</td><td>${r.hr||'—'}</td><td>${pval}</td><td>${mval}</td><td>${cat?cat.l:''}</td><td>${(r.tags||[]).join(', ')||'—'}</td></tr>`;}).join('')}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px;font-size:8pt;color:#999;border-top:0.5px solid #ddd;padding-top:8px">This report is generated for informational purposes only and does not constitute medical advice. Please consult your healthcare provider for clinical interpretation.</div>
+  `;
+  window.print();
+}
+
+/* ── SEED DEMO DATA ── */
+(function seedDemo(){
+  const uid='u_test';
+  const users=DB.users().filter(u=>u.u!=='demo');
+  users.push({id:uid,u:'demo',p:hsh('test1234')});
+  DB.saveUsers(users);
+  if(!DB.profile(uid)){
+    DB.saveProfile(uid,{name:'James Odhiambo',age:'47',sex:'Male',weight:'84',height:'172',bloodType:'O+',diet:'Omnivore',exercise:'1–2× / week',salt:'Moderate',sleep:'5–6 hrs',stress:'High',smoking:'Non-smoker',smokingFreq:null,drinking:'Occasional',drinkingFreq:'1–3',conditions:['High cholesterol'],bpMed:'No',family:'Yes',at:new Date().toISOString()});
+    const n=Date.now();
+    const rows=[
+      [0,7,138,88,82,['Morning surge','Seated'],'morning reading'],
+      [0,19,142,91,86,['After meal'],'after dinner'],
+      [1,8,135,85,79,['Seated'],''],
+      [1,14,128,82,74,['Had caffeine'],'after lunch'],
+      [2,7,122,78,71,['Morning surge'],''],
+      [2,21,131,84,80,['Stressed'],'felt stressed'],
+      [3,8,118,76,68,['Seated'],'morning, rested'],
+      [3,17,127,81,76,['Post exercise'],''],
+      [4,9,145,93,88,['Stressed','Morning surge'],'poor sleep'],
+      [4,20,140,89,85,['After meal'],''],
+      [5,7,120,79,70,['Seated'],''],
+      [5,15,124,80,73,['Had caffeine'],''],
+      [7,8,133,86,81,['Morning surge'],''],
+      [7,19,136,87,83,['Post exercise'],'after exercise'],
+      [9,7,117,74,66,['Seated'],'good morning'],
+      [9,22,129,83,78,['After meal'],''],
+      [11,8,141,90,87,['Stressed'],'stressful day'],
+      [11,16,138,88,84,['After meds'],''],
+      [13,7,119,77,69,['Morning surge'],''],
+      [13,20,132,85,80,['After meal'],''],
+      [15,8,125,81,74,['After meds'],''],
+      [15,14,128,83,76,['Had caffeine'],''],
+      [18,7,116,75,67,['Seated'],'felt great'],
+      [18,21,123,79,72,['Lying down'],''],
+      [20,8,134,87,82,['Morning surge'],''],
+      [20,17,130,84,79,['Post exercise'],''],
+      [23,7,121,78,71,['Seated'],''],
+      [23,19,127,82,75,['After meal'],''],
+      [27,8,143,92,89,['After meal','Had caffeine'],'high salt meal'],
+      [27,14,137,88,83,['Stressed'],''],
+      [30,7,118,76,68,['Morning surge'],''],
+      [30,20,122,80,72,['Lying down'],''],
+      [35,8,129,83,77,['After meds'],''],
+      [35,16,133,86,81,['Post exercise'],''],
+      [40,7,115,74,65,['Seated'],'best reading in weeks'],
+      [40,21,120,78,70,['Lying down'],''],
+      [45,8,136,87,82,['Morning surge'],''],
+      [45,14,139,89,85,['Stressed'],''],
+    ];
+    const data=rows.map(([daysAgo,hour,sys,dia,hr,tags,note],i)=>{
+      const d=new Date(n-daysAgo*864e5);d.setHours(hour,Math.floor(Math.random()*60),0,0);
+      return{id:n-i*1000,sys,dia,hr,time:d.toISOString(),note,tags,pp:pp(sys,dia),map:map(sys,dia)};
+    });
+    DB.saveReadings(uid,data);
+  }
+  UID=uid;DB.setSession(uid);
+})();
+
+/* ── INIT ── */
+function refreshAll(){
+  renderRecent();
+  if(document.getElementById('tab-history').classList.contains('on'))renderHistory();
+  if(document.getElementById('tab-stats').classList.contains('on'))renderStats();
+  if(document.getElementById('tab-trends').classList.contains('on'))renderTrends();
+  if(document.getElementById('tab-insights').classList.contains('on'))renderInsights();
+  const cnt=DB.readings(UID||'').length;
+  document.getElementById('rc').textContent=cnt+' reading'+(cnt!==1?'s':'');
+}
+(function init(){
+  if(UID){afterLogin();return;}
+  const uid=DB.session();
+  if(uid&&DB.users().find(u=>u.id===uid)){UID=uid;afterLogin();}
+  else showScreen('login');
+})();
+</script>
+</body>
+</html>
